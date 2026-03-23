@@ -655,49 +655,28 @@ function renderKpiBarChart(container, items, config){
     container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>';
     return;
   }
-  const barHeight = 22;
-  const gap = 10;
-  const topPad = 20;
-  const rightPad = 50;
-  const bottomPad = 14;
-  const leftPad = 160;
-  const width = 760;
-  const chartWidth = width - leftPad - rightPad;
-  const height = topPad + bottomPad + items.length * (barHeight + gap);
-  const max = Math.max(...items.map(item => item.total), 1);
-  const ticks = Array.from({length: 5}, (_, index)=>{
-    const value = Math.round((max / 4) * index);
-    const x = leftPad + Math.round((chartWidth / 4) * index);
-    return `
-      <g>
-        <line x1="${x}" y1="${topPad - 6}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line>
-        <text x="${x}" y="${topPad - 8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}</text>
-      </g>`;
+  const W=kpiChartWidth(container);
+  const isMobile=W<480;
+  const leftPad=isMobile?90:160, rightPad=isMobile?36:50;
+  const barHeight=isMobile?18:22, gap=isMobile?8:10;
+  const topPad=18, bottomPad=12;
+  const chartWidth=W-leftPad-rightPad, height=topPad+bottomPad+items.length*(barHeight+gap);
+  const max=Math.max(...items.map(i=>i.total),1);
+  const labelLimit=isMobile?12:22;
+  const ticks=Array.from({length:5},(_,idx)=>{
+    const value=Math.round((max/4)*idx), x=leftPad+Math.round((chartWidth/4)*idx);
+    return `<g><line x1="${x}" y1="${topPad-4}" x2="${x}" y2="${height-bottomPad+2}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad-6}" text-anchor="middle" class="kpi-svg-axis" style="font-size:${isMobile?7:9}px">${value}</text></g>`;
   }).join('');
-  const rows = items.map((item, index)=>{
-    const y = topPad + index * (barHeight + gap);
-    const barWidth = Math.max(10, Math.round((item.total / max) * chartWidth));
-    const activeValue = config.dimension === 'local' ? kpiState.local : kpiState.equipamento;
-    const isActive = activeValue === item.nome;
-    const shortLabel = PCMDB.escapeHtml(shortKpiLabel(item.nome));
-    const fullLabel = PCMDB.escapeHtml(item.nome);
-    const title = PCMDB.escapeHtml(`${index + 1}º | ${item.nome} | ${item.total} atendimentos`);
-    return `
-      <g class="kpi-svg-row ${isActive ? 'is-active' : ''}" data-kpi-dimension="${config.dimension}" data-kpi-value="${fullLabel}" tabindex="0" role="button" aria-label="Filtrar ${config.label} ${fullLabel}">
-        <title>${title}</title>
-        <text x="${leftPad - 8}" y="${y + 15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text>
-        <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect>
-        <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar"></rect>
-        <text x="${leftPad + barWidth + 6}" y="${y + 15}" class="kpi-svg-value" style="font-size:10px">${item.total}</text>
-      </g>`;
+  const rows=items.map((item,idx)=>{
+    const y=topPad+idx*(barHeight+gap), barWidth=Math.max(6,Math.round((item.total/max)*chartWidth));
+    const activeValue=config.dimension==='local'?kpiState.local:kpiState.equipamento;
+    const isActive=activeValue===item.nome;
+    const shortLabel=PCMDB.escapeHtml(item.nome.length>labelLimit?item.nome.slice(0,labelLimit-1)+'…':item.nome);
+    const fullLabel=PCMDB.escapeHtml(item.nome);
+    const title=PCMDB.escapeHtml(`${idx+1}º | ${item.nome} | ${item.total}`);
+    return `<g class="kpi-svg-row ${isActive?'is-active':''}" data-kpi-dimension="${config.dimension}" data-kpi-value="${fullLabel}" tabindex="0" role="button" aria-label="${title}"><title>${title}</title><text x="${leftPad-5}" y="${y+Math.round(barHeight*0.7)}" text-anchor="end" class="kpi-svg-label" style="font-size:${isMobile?8:10}px">${shortLabel}</text><rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="4" class="kpi-svg-track"></rect><rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="4" class="kpi-svg-bar"></rect><text x="${leftPad+barWidth+4}" y="${y+Math.round(barHeight*0.7)}" class="kpi-svg-value" style="font-size:${isMobile?8:10}px">${item.total}</text></g>`;
   }).join('');
-  container.innerHTML = `
-    <div class="kpi-svg-wrap">
-      <svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">
-        ${ticks}
-        ${rows}
-      </svg>
-    </div>`;
+  container.innerHTML=`<div class="kpi-svg-wrap"><svg viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">${ticks}${rows}</svg></div>`;
 }
 function getOperadorAtendimentos(ordensFiltered){
   const totals = new Map();
@@ -734,34 +713,32 @@ function getHomenHora(ordensFiltered){
     .sort((a,b) => b.total - a.total || a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}))
     .slice(0, 10);
 }
+function kpiChartWidth(container){
+  return Math.max(260, (container.clientWidth || container.offsetWidth || 400));
+}
 function renderKpiBarChartHH(container, items, config){
   if(!container) return;
   if(!items.length){ container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>'; return; }
-  const barHeight = 22, gap = 10, topPad = 20, rightPad = 60, bottomPad = 14, leftPad = 160, width = 760;
-  const chartWidth = width - leftPad - rightPad;
-  const height = topPad + bottomPad + items.length * (barHeight + gap);
-  const max = Math.max(...items.map(item => item.total), 1);
-  const ticks = Array.from({length: 5}, (_, index)=>{
-    const value = Math.round((max / 4) * index * 10) / 10;
-    const x = leftPad + Math.round((chartWidth / 4) * index);
-    return `<g><line x1="${x}" y1="${topPad - 6}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad - 8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}h</text></g>`;
+  const W=kpiChartWidth(container);
+  const isMobile=W<480;
+  const leftPad=isMobile?90:160, rightPad=isMobile?42:60;
+  const barHeight=isMobile?18:22, gap=isMobile?8:10;
+  const topPad=18, bottomPad=12;
+  const chartWidth=W-leftPad-rightPad, height=topPad+bottomPad+items.length*(barHeight+gap);
+  const max=Math.max(...items.map(i=>i.total),1), barColor=config.color||'#0f6e56';
+  const labelLimit=isMobile?12:22;
+  const ticks=Array.from({length:5},(_,idx)=>{
+    const value=Math.round((max/4)*idx*10)/10, x=leftPad+Math.round((chartWidth/4)*idx);
+    return `<g><line x1="${x}" y1="${topPad-4}" x2="${x}" y2="${height-bottomPad+2}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad-6}" text-anchor="middle" class="kpi-svg-axis" style="font-size:${isMobile?7:9}px">${value}h</text></g>`;
   }).join('');
-  const rows = items.map((item, index)=>{
-    const y = topPad + index * (barHeight + gap);
-    const barWidth = Math.max(10, Math.round((item.total / max) * chartWidth));
-    const shortLabel = PCMDB.escapeHtml(shortKpiLabel(item.nome));
-    const hh = Math.floor(item.total);
-    const mm = Math.round((item.total - hh) * 60);
-    const label = `${hh}h${mm > 0 ? String(mm).padStart(2,'0') + 'm' : ''}`;
-    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${PCMDB.escapeHtml(item.nome)}: ${label}">
-      <title>${PCMDB.escapeHtml(item.nome)}: ${label}</title>
-      <text x="${leftPad - 8}" y="${y + 15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text>
-      <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect>
-      <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar" style="fill:#0f6e56"></rect>
-      <text x="${leftPad + barWidth + 6}" y="${y + 15}" class="kpi-svg-value" style="font-size:10px">${label}</text>
-    </g>`;
+  const rows=items.map((item,idx)=>{
+    const y=topPad+idx*(barHeight+gap), barWidth=Math.max(6,Math.round((item.total/max)*chartWidth));
+    const shortLabel=PCMDB.escapeHtml(item.nome.length>labelLimit?item.nome.slice(0,labelLimit-1)+'…':item.nome);
+    const hh=Math.floor(item.total), mm=Math.round((item.total-hh)*60);
+    const label=`${hh}h${mm>0?String(mm).padStart(2,'0')+'m':''}`;
+    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${PCMDB.escapeHtml(item.nome)}: ${label}"><title>${PCMDB.escapeHtml(item.nome)}: ${label}</title><text x="${leftPad-5}" y="${y+Math.round(barHeight*0.7)}" text-anchor="end" class="kpi-svg-label" style="font-size:${isMobile?8:10}px">${shortLabel}</text><rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="4" class="kpi-svg-track"></rect><rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="4" class="kpi-svg-bar" style="fill:${barColor}"></rect><text x="${leftPad+barWidth+4}" y="${y+Math.round(barHeight*0.7)}" class="kpi-svg-value" style="font-size:${isMobile?8:10}px">${label}</text></g>`;
   }).join('');
-  container.innerHTML = `<div class="kpi-svg-wrap"><svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">${ticks}${rows}</svg></div>`;
+  container.innerHTML=`<div class="kpi-svg-wrap"><svg viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">${ticks}${rows}</svg></div>`;
 }
 function renderKpis(){
   const allPairs = filterPairsByTipo(filterPairsByText(getKpiPairs()));
@@ -1012,6 +989,12 @@ function ajustarAlturaTabelas(){
 window.addEventListener('resize', ajustarAlturaTabelas);
 document.addEventListener('DOMContentLoaded', ajustarAlturaTabelas);
 setTimeout(ajustarAlturaTabelas, 300);
+
+let _kpiResizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(_kpiResizeTimer);
+  _kpiResizeTimer = setTimeout(()=>{ if(document.querySelector('.page[data-page="kpis"].is-visible')) renderKpis(); }, 200);
+});
 </script>
 </body>
 </html>

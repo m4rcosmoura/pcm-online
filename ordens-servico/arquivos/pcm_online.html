@@ -1231,57 +1231,46 @@ function printOrder(ordem){
   };
 }
 
+function kpiChartWidth(container){
+  // Mede a largura real disponível; fallback 400 se ainda não renderizado
+  return Math.max(260, (container.clientWidth || container.offsetWidth || 400));
+}
 function renderKpiBarChart(container, items, config){
   if(!container) return;
-  if(!items.length){
-    container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>';
-    return;
-  }
-  const barHeight = 22;
-  const gap = 10;
-  const topPad = 20;
-  const rightPad = 50;
-  const bottomPad = 14;
-  const leftPad = 160;
-  const width = 760;
-  const chartWidth = width - leftPad - rightPad;
+  if(!items.length){ container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>'; return; }
+  const W = kpiChartWidth(container);
+  const isMobile = W < 480;
+  const leftPad = isMobile ? 90 : 160;
+  const rightPad = isMobile ? 36 : 50;
+  const barHeight = isMobile ? 18 : 22;
+  const gap = isMobile ? 8 : 10;
+  const topPad = 18, bottomPad = 12;
+  const chartWidth = W - leftPad - rightPad;
   const height = topPad + bottomPad + items.length * (barHeight + gap);
-  const max = Math.max(...items.map(item => item.total), 1);
-  const ticks = Array.from({length: 5}, (_, index)=>{
-    const value = Math.round((max / 4) * index);
-    const x = leftPad + Math.round((chartWidth / 4) * index);
-    return `
-      <g>
-        <line x1="${x}" y1="${topPad - 6}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line>
-        <text x="${x}" y="${topPad - 8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}</text>
-      </g>`;
+  const max = Math.max(...items.map(i => i.total), 1);
+  const labelLimit = isMobile ? 12 : 22;
+  const ticks = Array.from({length: 5}, (_, idx)=>{
+    const value = Math.round((max / 4) * idx);
+    const x = leftPad + Math.round((chartWidth / 4) * idx);
+    return `<g><line x1="${x}" y1="${topPad-4}" x2="${x}" y2="${height-bottomPad+2}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad-6}" text-anchor="middle" class="kpi-svg-axis" style="font-size:${isMobile?7:9}px">${value}</text></g>`;
   }).join('');
-
-  const rows = items.map((item, index)=>{
-    const y = topPad + index * (barHeight + gap);
-    const barWidth = Math.max(10, Math.round((item.total / max) * chartWidth));
+  const rows = items.map((item, idx)=>{
+    const y = topPad + idx * (barHeight + gap);
+    const barWidth = Math.max(6, Math.round((item.total / max) * chartWidth));
     const activeValue = config.dimension === 'local' ? kpiState.local : kpiState.equipamento;
     const isActive = activeValue === item.nome;
-    const shortLabel = PCMDB.escapeHtml(shortKpiLabel(item.nome));
+    const shortLabel = PCMDB.escapeHtml(item.nome.length > labelLimit ? item.nome.slice(0, labelLimit-1)+'…' : item.nome);
     const fullLabel = PCMDB.escapeHtml(item.nome);
-    const title = PCMDB.escapeHtml(`${index + 1}º | ${item.nome} | ${item.total} atendimentos`);
-    return `
-      <g class="kpi-svg-row ${isActive ? 'is-active' : ''}" data-kpi-dimension="${config.dimension}" data-kpi-value="${fullLabel}" tabindex="0" role="button" aria-label="Filtrar ${config.label} ${fullLabel}">
-        <title>${title}</title>
-        <text x="${leftPad - 8}" y="${y + 15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text>
-        <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect>
-        <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar"></rect>
-        <text x="${leftPad + barWidth + 6}" y="${y + 15}" class="kpi-svg-value" style="font-size:10px">${item.total}</text>
-      </g>`;
+    const title = PCMDB.escapeHtml(`${idx+1}º | ${item.nome} | ${item.total}`);
+    return `<g class="kpi-svg-row ${isActive?'is-active':''}" data-kpi-dimension="${config.dimension}" data-kpi-value="${fullLabel}" tabindex="0" role="button" aria-label="${title}">
+      <title>${title}</title>
+      <text x="${leftPad-5}" y="${y+Math.round(barHeight*0.7)}" text-anchor="end" class="kpi-svg-label" style="font-size:${isMobile?8:10}px">${shortLabel}</text>
+      <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="4" class="kpi-svg-track"></rect>
+      <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="4" class="kpi-svg-bar"></rect>
+      <text x="${leftPad+barWidth+4}" y="${y+Math.round(barHeight*0.7)}" class="kpi-svg-value" style="font-size:${isMobile?8:10}px">${item.total}</text>
+    </g>`;
   }).join('');
-
-  container.innerHTML = `
-    <div class="kpi-svg-wrap">
-      <svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">
-        ${ticks}
-        ${rows}
-      </svg>
-    </div>`;
+  container.innerHTML = `<div class="kpi-svg-wrap"><svg viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">${ticks}${rows}</svg></div>`;
 }
 function getOperadorAtendimentos(ordensFiltered){
   const totals = new Map();
@@ -1375,39 +1364,49 @@ function renderKpiCards(ordensFiltered){
 function renderKpiPieChart(container,items){
   if(!container) return;
   if(!items.length){ container.innerHTML='<div class="empty">Sem dados.</div>'; return; }
+  const W=kpiChartWidth(container);
+  const isMobile=W<420;
+  const pieSize=isMobile?Math.min(W-20,200):280;
+  const r=Math.round(pieSize*0.45), cx=Math.round(pieSize/2), cy=Math.round(pieSize/2);
   const colors=['#185FA5','#16a34a','#d97706','#dc2626','#0f6e56','#7c3aed','#0891b2'];
   const total=items.reduce((s,i)=>s+i.total,0);
-  const cx=170,cy=170,r=155; let angle=-Math.PI/2, slices='', legend='';
+  let angle=-Math.PI/2, slices='', legend='';
   items.forEach((item,idx)=>{
     const frac=item.total/total, a1=angle, a2=angle+frac*2*Math.PI;
     const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
     const large=frac>0.5?1:0, color=colors[idx%colors.length], pct=Math.round(frac*100);
     slices+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${color}" stroke="var(--surface)" stroke-width="2"><title>${item.nome}: ${item.total} (${pct}%)</title></path>`;
     const midA=(a1+a2)/2;
-    if(pct>=5) slices+=`<text x="${cx+(r*0.65)*Math.cos(midA)}" y="${cy+(r*0.65)*Math.sin(midA)}" text-anchor="middle" dominant-baseline="middle" style="font-size:15px;font-weight:700;fill:#fff">${pct}%</text>`;
-    legend+=`<div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="width:14px;height:14px;border-radius:3px;background:${color};flex-shrink:0"></span><span style="color:var(--text)">${item.nome}</span><span style="margin-left:auto;font-weight:700;color:var(--text)">${item.total}</span></div>`;
+    if(pct>=5) slices+=`<text x="${cx+(r*0.65)*Math.cos(midA)}" y="${cy+(r*0.65)*Math.sin(midA)}" text-anchor="middle" dominant-baseline="middle" style="font-size:${isMobile?11:15}px;font-weight:700;fill:#fff">${pct}%</text>`;
+    legend+=`<div style="display:flex;align-items:center;gap:6px;font-size:${isMobile?11:13}px"><span style="width:12px;height:12px;border-radius:3px;background:${color};flex-shrink:0"></span><span style="color:var(--text)">${item.nome}</span><span style="margin-left:auto;font-weight:700;color:var(--text)">${item.total}</span></div>`;
     angle=a2;
   });
-  container.innerHTML=`<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:12px 0"><svg viewBox="0 0 340 340" style="width:280px;height:280px;flex-shrink:0">${slices}</svg><div style="display:grid;gap:8px;flex:1;min-width:140px">${legend}</div></div>`;
+  const flexDir=isMobile?'column':'row';
+  container.innerHTML=`<div style="display:flex;flex-direction:${flexDir};gap:16px;align-items:center;flex-wrap:wrap;padding:8px 0"><svg viewBox="0 0 ${pieSize} ${pieSize}" style="width:${pieSize}px;height:${pieSize}px;flex-shrink:0">${slices}</svg><div style="display:grid;gap:6px;flex:1;min-width:100px">${legend}</div></div>`;
 }
 function renderKpiBarChartHH(container,items,config){
   if(!container) return;
   if(!items.length){ container.innerHTML='<div class="empty">Sem dados para este recorte.</div>'; return; }
-  const barHeight=22,gap=10,topPad=20,rightPad=60,bottomPad=14,leftPad=160,width=760;
-  const chartWidth=width-leftPad-rightPad, height=topPad+bottomPad+items.length*(barHeight+gap);
+  const W=kpiChartWidth(container);
+  const isMobile=W<480;
+  const leftPad=isMobile?90:160, rightPad=isMobile?42:60;
+  const barHeight=isMobile?18:22, gap=isMobile?8:10;
+  const topPad=18, bottomPad=12;
+  const chartWidth=W-leftPad-rightPad, height=topPad+bottomPad+items.length*(barHeight+gap);
   const max=Math.max(...items.map(i=>i.total),1), barColor=config.color||'#0f6e56';
+  const labelLimit=isMobile?12:22;
   const ticks=Array.from({length:5},(_,idx)=>{
     const value=Math.round((max/4)*idx*10)/10, x=leftPad+Math.round((chartWidth/4)*idx);
-    return `<g><line x1="${x}" y1="${topPad-6}" x2="${x}" y2="${height-bottomPad+4}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad-8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}h</text></g>`;
+    return `<g><line x1="${x}" y1="${topPad-4}" x2="${x}" y2="${height-bottomPad+2}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad-6}" text-anchor="middle" class="kpi-svg-axis" style="font-size:${isMobile?7:9}px">${value}h</text></g>`;
   }).join('');
   const rows=items.map((item,idx)=>{
-    const y=topPad+idx*(barHeight+gap), barWidth=Math.max(10,Math.round((item.total/max)*chartWidth));
-    const shortLabel=PCMDB.escapeHtml(shortKpiLabel(item.nome));
+    const y=topPad+idx*(barHeight+gap), barWidth=Math.max(6,Math.round((item.total/max)*chartWidth));
+    const shortLabel=PCMDB.escapeHtml(item.nome.length>labelLimit?item.nome.slice(0,labelLimit-1)+'…':item.nome);
     const hh=Math.floor(item.total), mm=Math.round((item.total-hh)*60);
     const label=`${hh}h${mm>0?String(mm).padStart(2,'0')+'m':''}`;
-    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${PCMDB.escapeHtml(item.nome)}: ${label}"><title>${PCMDB.escapeHtml(item.nome)}: ${label}</title><text x="${leftPad-8}" y="${y+15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text><rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect><rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar" style="fill:${barColor}"></rect><text x="${leftPad+barWidth+6}" y="${y+15}" class="kpi-svg-value" style="font-size:10px">${label}</text></g>`;
+    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${PCMDB.escapeHtml(item.nome)}: ${label}"><title>${PCMDB.escapeHtml(item.nome)}: ${label}</title><text x="${leftPad-5}" y="${y+Math.round(barHeight*0.7)}" text-anchor="end" class="kpi-svg-label" style="font-size:${isMobile?8:10}px">${shortLabel}</text><rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="4" class="kpi-svg-track"></rect><rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="4" class="kpi-svg-bar" style="fill:${barColor}"></rect><text x="${leftPad+barWidth+4}" y="${y+Math.round(barHeight*0.7)}" class="kpi-svg-value" style="font-size:${isMobile?8:10}px">${label}</text></g>`;
   }).join('');
-  container.innerHTML=`<div class="kpi-svg-wrap"><svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel||''}">${ticks}${rows}</svg></div>`;
+  container.innerHTML=`<div class="kpi-svg-wrap"><svg viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel||''}">${ticks}${rows}</svg></div>`;
 }
 function renderKpis(){
   // Filtro unificado para todos os gráficos
@@ -1591,6 +1590,12 @@ function ajustarAlturaTabelas(){
 window.addEventListener('resize', ajustarAlturaTabelas);
 document.addEventListener('DOMContentLoaded', ajustarAlturaTabelas);
 setTimeout(ajustarAlturaTabelas, 300);
+
+let _kpiResizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(_kpiResizeTimer);
+  _kpiResizeTimer = setTimeout(()=>{ if(document.querySelector('.page[data-page="kpis"].is-visible')) renderKpis(); }, 200);
+});
 </script>
 </body>
 </html>
