@@ -210,16 +210,18 @@ td.cell-wrap > span.wrap-inner {
       </div>
 
       <div class="kpi-filter-row" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
-        <input id="kpiTextFilter" class="input kpi-text-filter" type="search" placeholder="Filtrar locais e equipamentos..." style="flex:1;min-width:200px">
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="kpiDateStart" class="input" type="datetime-local" style="width:185px;padding:8px 10px;font-size:13px" title="Data/hora inicial">
+        <input id="kpiTextFilter" class="input kpi-text-filter" type="search" placeholder="Filtrar locais e equipamentos..." style="flex:1;min-width:160px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          <input id="kpiDateStart" class="input" type="datetime-local" style="width:175px;padding:8px 10px;font-size:13px" title="Data/hora inicial">
           <span style="color:var(--muted);font-size:13px">até</span>
-          <input id="kpiDateEnd" class="input" type="datetime-local" style="width:185px;padding:8px 10px;font-size:13px" title="Data/hora final">
+          <input id="kpiDateEnd" class="input" type="datetime-local" style="width:175px;padding:8px 10px;font-size:13px" title="Data/hora final">
           <button id="kpiDateClear" class="btn btn-secondary" type="button" style="padding:8px 12px;font-size:12px">Limpar</button>
         </div>
       </div>
 
       <div id="kpiTipoButtons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+
+      <div id="kpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px"></div>
 
       <div class="kpi-grid-two">
         <div class="kpi-panel">
@@ -253,6 +255,38 @@ td.cell-wrap > span.wrap-inner {
           </div>
           <div id="chartKpiHH" class="kpi-chart-box" aria-label="Gráfico Homem Hora"></div>
         </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>MTTR — Tempo Médio para Reparo</label>
+            <span class="muted">Top 10 equipamento+local (O.S. corretivas finalizadas)</span>
+          </div>
+          <div id="chartKpiMTTR" class="kpi-chart-box" aria-label="Gráfico MTTR"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>MTBF — Tempo Médio Entre Falhas</label>
+            <span class="muted">Top 10 equipamento+local (O.S. corretivas)</span>
+          </div>
+          <div id="chartKpiMTBF" class="kpi-chart-box" aria-label="Gráfico MTBF"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>Distribuição por Tipo de Manutenção</label>
+            <span class="muted">% de O.S. por tipo</span>
+          </div>
+          <div id="chartKpiTipo" class="kpi-chart-box" aria-label="Gráfico distribuição por tipo"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>HH por Tipo de Manutenção</label>
+            <span class="muted">Horas trabalhadas por tipo (O.S. finalizadas)</span>
+          </div>
+          <div id="chartKpiHHTipo" class="kpi-chart-box" aria-label="Gráfico HH por tipo"></div>
+        </div>
       </div>
 
     </div>
@@ -270,6 +304,7 @@ td.cell-wrap > span.wrap-inner {
         <div class="field"><label>Tipo de manutenção <span class="req">*</span></label><div class="dd" data-dd="tipo"></div></div>
         <div class="field"><label>Executores <span class="req">*</span></label><div class="dd" data-dd="executores"></div></div>
         <div class="field"><label for="fSolicitante">Solicitante <span class="req">*</span></label><input id="fSolicitante" class="input" type="text" placeholder="Digite o nome do solicitante"></div>
+        <div class="field"><label for="fComponente2">Componente <span class="req">*</span></label><div class="dd" data-dd="componente"></div></div>
         <div class="field"><label for="fDataAbertura">Data/Hora de abertura <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label><input id="fDataAbertura" class="input" type="datetime-local"></div>
         <div class="field" style="grid-column:1/-1"><label for="fObs">Observação da abertura</label><textarea id="fObs" class="textarea" placeholder="Descreva o problema, sintoma ou instrução inicial"></textarea></div>
       </div>
@@ -310,6 +345,11 @@ const chartKpiLocais = document.getElementById('chartKpiLocais');
 const chartKpiEquipamentos = document.getElementById('chartKpiEquipamentos');
 const chartKpiOperadores = document.getElementById('chartKpiOperadores');
 const chartKpiHH = document.getElementById('chartKpiHH');
+const chartKpiMTTR = document.getElementById('chartKpiMTTR');
+const chartKpiMTBF = document.getElementById('chartKpiMTBF');
+const chartKpiTipo = document.getElementById('chartKpiTipo');
+const chartKpiHHTipo = document.getElementById('chartKpiHHTipo');
+const kpiCards = document.getElementById('kpiCards');
 const kpiTextFilter = document.getElementById('kpiTextFilter');
 const kpiLocaisHint = document.getElementById('kpiLocaisHint');
 const kpiEquipamentosHint = document.getElementById('kpiEquipamentosHint');
@@ -387,10 +427,60 @@ function applyFilter(){
   const page=activePage();
   if(!page) return;
   if(page.dataset.page==='cadastros') return;
+  // Para finalizadas, re-renderizar com filtro aplicado na paginação
+  if(page.dataset.page==='finalizadas'){
+    renderFinalizadasFiltradas(q);
+    return;
+  }
   page.querySelectorAll('tbody tr').forEach(tr=>{
     const text=((tr.textContent||'')+' '+(tr.dataset.obs||'')).toLowerCase();
     tr.style.display=text.includes(q)?'table-row':'none';
   });
+}
+
+function renderFinalizadasFiltradas(q){
+  const finalizadas = ordens.filter(o=>o.status==='FINALIZADA');
+  const filtradas = q ? finalizadas.filter(o=>{
+    const texto = [o.data_fim,o.prioridade,String(o.id_os),o.local,o.equipamento,o.componente,o.causa_raiz,o.o_que_feito,o.observacao_fechamento,(o.executores||[]).join(' ')].join(' ').toLowerCase();
+    return texto.includes(q);
+  }) : finalizadas;
+
+  const totalPages = Math.max(1, Math.ceil(filtradas.length / FINALIZADAS_PER_PAGE));
+  if(finalizadasPage >= totalPages) finalizadasPage = 0;
+  const pageSlice = filtradas.slice(finalizadasPage * FINALIZADAS_PER_PAGE, (finalizadasPage + 1) * FINALIZADAS_PER_PAGE);
+  const acoes = o => `<div class="action-group"><button class="btn-icon" type="button" data-os-print="${o.id_os}" title="Imprimir O.S.">🖨️</button><button class="btn-icon btn-icon-edit" type="button" data-os-edit="${o.id_os}" title="Editar O.S.">✏️</button><button class="btn-icon btn-icon-delete" type="button" data-os-delete="${o.id_os}" title="Excluir O.S.">🗑️</button></div>`;
+
+  tbodyFinalizadas.innerHTML = pageSlice.length ? pageSlice.map(o=>`
+    <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '')}">
+      <td><span class="badge finalizada">FINALIZADA</span></td>
+      <td>${PCMDB.escapeHtml(o.data_fim)}</td>
+      <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
+      <td>${o.id_os}</td>
+      <td>${PCMDB.escapeHtml(o.local)}</td>
+      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td>${PCMDB.escapeHtml(o.componente || '-')}</td>
+      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz || '-')}</span></td>
+      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '-')}</span></td>
+      <td>${PCMDB.escapeHtml((o.executores||[]).join(' / '))}</td>
+      <td>${acoes(o)}</td>
+    </tr>`).join('') : `<tr><td colspan="11" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
+
+  const pagination = document.getElementById('finalizadasPagination');
+  if(pagination){
+    if(totalPages <= 1){ pagination.innerHTML = ''; }
+    else {
+      let btns = '';
+      for(let i = 0; i < totalPages; i++){
+        const start = i * FINALIZADAS_PER_PAGE + 1;
+        const end = Math.min((i + 1) * FINALIZADAS_PER_PAGE, filtradas.length);
+        btns += `<button class="btn btn-secondary${i === finalizadasPage ? ' tab is-active' : ''}" style="padding:8px 14px;font-size:13px" type="button" data-fin-page="${i}">Página ${i+1} <span style="font-weight:400;opacity:.7">(${start}–${end})</span></button>`;
+      }
+      pagination.innerHTML = `<span style="font-size:13px;color:var(--muted)">Total: ${filtradas.length} registros${q ? ' (filtrados)' : ''}</span> ${btns}`;
+      pagination.querySelectorAll('[data-fin-page]').forEach(btn => {
+        btn.addEventListener('click', ()=>{ finalizadasPage = Number(btn.dataset.finPage); renderFinalizadasFiltradas(q); });
+      });
+    }
+  }
 }
 
 function closeModal(){
@@ -644,7 +734,7 @@ document.addEventListener('input', (e)=>{
     }
     return;
   }
-  if(e.target===searchInput) applyFilter();
+  if(e.target===searchInput){ finalizadasPage = 0; applyFilter(); }
   if(e.target===cadSearchInput) renderCadastroSearchResults();
 });
 document.addEventListener('keydown', async (e)=>{
@@ -686,6 +776,7 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
     data_abertura: dataAbertura
   };
   if(!payload.prioridade || !payload.local || !payload.equipamento || !payload.tipo_manutencao || !payload.executores.length || !payload.solicitante){ alert('Preencha os campos obrigatórios.'); return; }
+  if(!editingOrderId && !payload.componente){ alert('O campo Componente é obrigatório.'); return; }
   if(editingOrderId){
     if(!askConfirmation(`Tem certeza que deseja salvar as alterações da O.S. ${editingOrderId}?`)) return;
     const ordem = await PCMDB.getOrder(editingOrderId);
@@ -759,17 +850,20 @@ function formatDateForFile(value){
   if(!value) return 'todos';
   return String(value).replace(/-/g,'');
 }
-function orderMatchesReportDate(order, isoDate){
-  if(!isoDate) return true;
-  const date = parseBRDate(order.data_fim || order.data_inicio || order.data_abertura);
-  if(!date) return false;
+function orderMatchesReportDate(order, startDate, endDate){
+  if(!startDate && !endDate) return true;
+  const date = parseBRDate(order.data_abertura || order.data_inicio || order.data_fim);
+  if(!date) return !startDate && !endDate;
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth()+1).padStart(2,'0');
   const dd = String(date.getDate()).padStart(2,'0');
-  return `${yyyy}-${mm}-${dd}` === isoDate;
+  const isoDate = `${yyyy}-${mm}-${dd}`;
+  if(startDate && isoDate < startDate) return false;
+  if(endDate && isoDate > endDate) return false;
+  return true;
 }
-function reportRows(type, isoDate){
-  const filtered = ordens.filter(order => orderMatchesReportDate(order, isoDate));
+function reportRows(type, startDate, endDate){
+  const filtered = ordens.filter(order => orderMatchesReportDate(order, startDate, endDate));
   if(type === 'abertas') return filtered.filter(o => o.status === 'ABERTA');
   if(type === 'andamento') return filtered.filter(o => o.status === 'ANDAMENTO');
   if(type === 'finalizadas') return filtered.filter(o => o.status === 'FINALIZADA');
@@ -801,21 +895,31 @@ function downloadTextFile(content, filename, mimeType){
 function buildReportData(type, startDate, endDate){
   if(type === 'cadastros') return reportCadastroRows();
   return reportRows(type, startDate, endDate).map(order => ({
-    os: order.id_os,
-    status: order.status,
-    data_abertura: order.data_abertura || '',
-    data_inicio: order.data_inicio || '',
-    data_fim: order.data_fim || '',
-    prioridade: order.prioridade || '',
-    local: order.local || '',
-    equipamento: order.equipamento || '',
-    componente: order.componente || '',
-    tipo_manutencao: order.tipo_manutencao || '',
-    executores: Array.isArray(order.executores) ? order.executores.join(' / ') : '',
-    solicitante: order.solicitante || '',
-    observacao_abertura: order.observacao_abertura || '',
-    causa_raiz: order.causa_raiz || '',
-    observacao_fechamento: order.observacao_fechamento || ''
+    numero_os:              order.id_os,
+    status:                 order.status || '',
+    pendente:               order.pendente ? 'SIM' : 'NÃO',
+    data_abertura:          order.data_abertura || '',
+    data_inicio:            order.data_inicio || '',
+    data_fim:               order.data_fim || '',
+    tempo_atendimento_hhmm: (()=>{
+      const s = parseBRDate(order.data_inicio);
+      const e = parseBRDate(order.data_fim);
+      if(!s || !e) return '';
+      const diff = Math.max(0, Math.floor((e - s) / 60000));
+      return `${String(Math.floor(diff/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`;
+    })(),
+    prioridade:             order.prioridade || '',
+    tipo_manutencao:        order.tipo_manutencao || '',
+    local:                  order.local || '',
+    equipamento:            order.equipamento || '',
+    componente:             order.componente || '',
+    executores:             Array.isArray(order.executores) ? order.executores.join(' / ') : (order.executores || ''),
+    solicitante:            order.solicitante || '',
+    observacao_abertura:    order.observacao_abertura || '',
+    causa_raiz:             order.causa_raiz || '',
+    o_que_foi_feito:        order.o_que_feito || order.observacao_fechamento || '',
+    o_que_falta:            order.o_que_falta || '',
+    os_origem:              order.os_origem || ''
   }));
 }
 function buildReportSuffix(startDate, endDate){
@@ -1183,121 +1287,181 @@ function getOperadorAtendimentos(ordensFiltered){
   const totals = new Map();
   for(const o of ordensFiltered){
     const execs = Array.isArray(o.executores) ? o.executores : splitMultiValue(o.executores);
-    for(const ex of execs){
-      const nome = normalizeKpiItem(ex);
-      if(!nome) continue;
-      totals.set(nome, (totals.get(nome) || 0) + 1);
-    }
+    for(const ex of execs){ const nome = normalizeKpiItem(ex); if(!nome) continue; totals.set(nome, (totals.get(nome)||0)+1); }
   }
-  return [...totals.entries()]
-    .map(([nome, total]) => ({ nome, total }))
-    .sort((a,b) => b.total - a.total || a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}))
-    .slice(0, 10);
+  return [...totals.entries()].map(([nome,total])=>({nome,total})).sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'})).slice(0,10);
 }
 function getHomenHora(ordensFiltered){
   const totals = new Map();
   for(const o of ordensFiltered){
-    if(String(o.status||'').toUpperCase() !== 'FINALIZADA') continue;
-    const inicio = parseBRtoDate(o.data_inicio);
-    const fim    = parseBRtoDate(o.data_fim);
-    if(!inicio || !fim || fim <= inicio) continue;
-    const horas = (fim - inicio) / 3600000;
-    const execs = Array.isArray(o.executores) ? o.executores : splitMultiValue(o.executores);
-    for(const ex of execs){
-      const nome = normalizeKpiItem(ex);
-      if(!nome) continue;
-      totals.set(nome, (totals.get(nome) || 0) + horas);
-    }
+    if(String(o.status||'').toUpperCase()!=='FINALIZADA') continue;
+    const s=parseBRtoDate(o.data_inicio), e=parseBRtoDate(o.data_fim);
+    if(!s||!e||e<=s) continue;
+    const horas=(e-s)/3600000;
+    const execs=Array.isArray(o.executores)?o.executores:splitMultiValue(o.executores);
+    for(const ex of execs){ const nome=normalizeKpiItem(ex); if(!nome) continue; totals.set(nome,(totals.get(nome)||0)+horas); }
   }
-  return [...totals.entries()]
-    .map(([nome, total]) => ({ nome, total: Math.round(total * 10) / 10 }))
-    .sort((a,b) => b.total - a.total || a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}))
-    .slice(0, 10);
+  return [...totals.entries()].map(([nome,total])=>({nome,total:Math.round(total*10)/10})).sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'})).slice(0,10);
 }
-function renderKpiBarChartHH(container, items, config){
-  if(!container) return;
-  if(!items.length){
-    container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>';
-    return;
+function getMTTR(ordensFiltered){
+  const map = new Map();
+  for(const o of ordensFiltered){
+    if(String(o.status||'').toUpperCase()!=='FINALIZADA') continue;
+    if(normalizeKpiItem(o.tipo_manutencao)!=='CORRETIVA') continue;
+    const s=parseBRtoDate(o.data_inicio), e=parseBRtoDate(o.data_fim);
+    if(!s||!e||e<=s) continue;
+    const chave=`${normalizeKpiItem(o.equipamento)} | ${normalizeKpiItem(o.local)}`;
+    if(!map.has(chave)) map.set(chave,{soma:0,count:0});
+    const entry=map.get(chave); entry.soma+=(e-s)/3600000; entry.count++;
   }
-  const barHeight = 22;
-  const gap = 10;
-  const topPad = 20;
-  const rightPad = 60;
-  const bottomPad = 14;
-  const leftPad = 160;
-  const width = 760;
-  const chartWidth = width - leftPad - rightPad;
-  const height = topPad + bottomPad + items.length * (barHeight + gap);
-  const max = Math.max(...items.map(item => item.total), 1);
-  const ticks = Array.from({length: 5}, (_, index)=>{
-    const value = Math.round((max / 4) * index * 10) / 10;
-    const x = leftPad + Math.round((chartWidth / 4) * index);
-    return `<g>
-      <line x1="${x}" y1="${topPad - 6}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line>
-      <text x="${x}" y="${topPad - 8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}h</text>
-    </g>`;
+  return [...map.entries()].map(([nome,{soma,count}])=>({nome,total:Math.round((soma/count)*10)/10})).sort((a,b)=>b.total-a.total).slice(0,10);
+}
+function getMTBF(ordensFiltered){
+  const map = new Map();
+  for(const o of ordensFiltered){
+    if(normalizeKpiItem(o.tipo_manutencao)!=='CORRETIVA') continue;
+    const chave=`${normalizeKpiItem(o.equipamento)} | ${normalizeKpiItem(o.local)}`;
+    const d=parseBRtoDate(o.data_abertura||o.data_inicio); if(!d) continue;
+    if(!map.has(chave)) map.set(chave,[]);
+    map.get(chave).push(d.getTime());
+  }
+  const result=[];
+  for(const [nome,ts] of map.entries()){
+    if(ts.length<2) continue;
+    ts.sort((a,b)=>a-b);
+    let soma=0; for(let i=1;i<ts.length;i++) soma+=(ts[i]-ts[i-1])/3600000;
+    result.push({nome,total:Math.round((soma/(ts.length-1))*10)/10});
+  }
+  return result.sort((a,b)=>a.total-b.total).slice(0,10);
+}
+function getDistribuicaoTipo(ordensFiltered){
+  const map=new Map();
+  for(const o of ordensFiltered){ const tipo=normalizeKpiItem(o.tipo_manutencao)||'SEM TIPO'; map.set(tipo,(map.get(tipo)||0)+1); }
+  return [...map.entries()].map(([nome,total])=>({nome,total})).sort((a,b)=>b.total-a.total);
+}
+function getHHPorTipo(ordensFiltered){
+  const map=new Map();
+  for(const o of ordensFiltered){
+    if(String(o.status||'').toUpperCase()!=='FINALIZADA') continue;
+    const s=parseBRtoDate(o.data_inicio), e=parseBRtoDate(o.data_fim); if(!s||!e||e<=s) continue;
+    const tipo=normalizeKpiItem(o.tipo_manutencao)||'SEM TIPO';
+    map.set(tipo,(map.get(tipo)||0)+(e-s)/3600000);
+  }
+  return [...map.entries()].map(([nome,total])=>({nome,total:Math.round(total*10)/10})).sort((a,b)=>b.total-a.total);
+}
+function renderKpiCards(ordensFiltered){
+  if(!kpiCards) return;
+  const fin=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='FINALIZADA');
+  const ab=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ABERTA');
+  const and=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ANDAMENTO');
+  const pend=ordensFiltered.filter(o=>o.pendente);
+  const corr=ordensFiltered.filter(o=>normalizeKpiItem(o.tipo_manutencao)==='CORRETIVA');
+  const total=ordensFiltered.length;
+  const pctCorr=total?Math.round((corr.length/total)*100):0;
+  let mttrGeral='-';
+  const corrFin=fin.filter(o=>normalizeKpiItem(o.tipo_manutencao)==='CORRETIVA');
+  if(corrFin.length){ let soma=0,cnt=0; for(const o of corrFin){ const s=parseBRtoDate(o.data_inicio),e=parseBRtoDate(o.data_fim); if(s&&e&&e>s){soma+=(e-s)/3600000;cnt++;} } if(cnt) mttrGeral=(Math.round((soma/cnt)*10)/10)+'h'; }
+  const cards=[
+    {label:'Total de O.S.',value:total,color:'#185FA5'},
+    {label:'Abertas',value:ab.length,color:'#2563eb'},
+    {label:'Em andamento',value:and.length,color:'#f59e0b'},
+    {label:'Finalizadas',value:fin.length,color:'#16a34a'},
+    {label:'Pendentes',value:pend.length,color:'#d97706'},
+    {label:'% Corretiva',value:pctCorr+'%',color:pctCorr>60?'#dc2626':'#185FA5'},
+    {label:'MTTR Geral',value:mttrGeral,color:'#0f6e56'},
+  ];
+  kpiCards.innerHTML=cards.map(c=>`<div style="background:var(--surface-alt);border:1px solid var(--panel-border);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${c.label}</div><div style="font-size:26px;font-weight:900;color:${c.color};line-height:1">${c.value}</div></div>`).join('');
+}
+function renderKpiPieChart(container,items){
+  if(!container) return;
+  if(!items.length){ container.innerHTML='<div class="empty">Sem dados.</div>'; return; }
+  const colors=['#185FA5','#16a34a','#d97706','#dc2626','#0f6e56','#7c3aed','#0891b2'];
+  const total=items.reduce((s,i)=>s+i.total,0);
+  const cx=170,cy=170,r=155; let angle=-Math.PI/2, slices='', legend='';
+  items.forEach((item,idx)=>{
+    const frac=item.total/total, a1=angle, a2=angle+frac*2*Math.PI;
+    const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+    const large=frac>0.5?1:0, color=colors[idx%colors.length], pct=Math.round(frac*100);
+    slices+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${color}" stroke="var(--surface)" stroke-width="2"><title>${item.nome}: ${item.total} (${pct}%)</title></path>`;
+    const midA=(a1+a2)/2;
+    if(pct>=5) slices+=`<text x="${cx+(r*0.65)*Math.cos(midA)}" y="${cy+(r*0.65)*Math.sin(midA)}" text-anchor="middle" dominant-baseline="middle" style="font-size:15px;font-weight:700;fill:#fff">${pct}%</text>`;
+    legend+=`<div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="width:14px;height:14px;border-radius:3px;background:${color};flex-shrink:0"></span><span style="color:var(--text)">${item.nome}</span><span style="margin-left:auto;font-weight:700;color:var(--text)">${item.total}</span></div>`;
+    angle=a2;
+  });
+  container.innerHTML=`<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:12px 0"><svg viewBox="0 0 340 340" style="width:280px;height:280px;flex-shrink:0">${slices}</svg><div style="display:grid;gap:8px;flex:1;min-width:140px">${legend}</div></div>`;
+}
+function renderKpiBarChartHH(container,items,config){
+  if(!container) return;
+  if(!items.length){ container.innerHTML='<div class="empty">Sem dados para este recorte.</div>'; return; }
+  const barHeight=22,gap=10,topPad=20,rightPad=60,bottomPad=14,leftPad=160,width=760;
+  const chartWidth=width-leftPad-rightPad, height=topPad+bottomPad+items.length*(barHeight+gap);
+  const max=Math.max(...items.map(i=>i.total),1), barColor=config.color||'#0f6e56';
+  const ticks=Array.from({length:5},(_,idx)=>{
+    const value=Math.round((max/4)*idx*10)/10, x=leftPad+Math.round((chartWidth/4)*idx);
+    return `<g><line x1="${x}" y1="${topPad-6}" x2="${x}" y2="${height-bottomPad+4}" class="kpi-svg-grid"></line><text x="${x}" y="${topPad-8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}h</text></g>`;
   }).join('');
-  const rows = items.map((item, index)=>{
-    const y = topPad + index * (barHeight + gap);
-    const barWidth = Math.max(10, Math.round((item.total / max) * chartWidth));
-    const shortLabel = PCMDB.escapeHtml(shortKpiLabel(item.nome));
-    const fullLabel = PCMDB.escapeHtml(item.nome);
-    const hh = Math.floor(item.total);
-    const mm = Math.round((item.total - hh) * 60);
-    const label = `${hh}h${mm > 0 ? String(mm).padStart(2,'0') + 'm' : ''}`;
-    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${fullLabel}: ${label}">
-      <title>${PCMDB.escapeHtml(item.nome)}: ${label}</title>
-      <text x="${leftPad - 8}" y="${y + 15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text>
-      <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect>
-      <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar" style="fill:#0f6e56"></rect>
-      <text x="${leftPad + barWidth + 6}" y="${y + 15}" class="kpi-svg-value" style="font-size:10px">${label}</text>
-    </g>`;
+  const rows=items.map((item,idx)=>{
+    const y=topPad+idx*(barHeight+gap), barWidth=Math.max(10,Math.round((item.total/max)*chartWidth));
+    const shortLabel=PCMDB.escapeHtml(shortKpiLabel(item.nome));
+    const hh=Math.floor(item.total), mm=Math.round((item.total-hh)*60);
+    const label=`${hh}h${mm>0?String(mm).padStart(2,'0')+'m':''}`;
+    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${PCMDB.escapeHtml(item.nome)}: ${label}"><title>${PCMDB.escapeHtml(item.nome)}: ${label}</title><text x="${leftPad-8}" y="${y+15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text><rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect><rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar" style="fill:${barColor}"></rect><text x="${leftPad+barWidth+6}" y="${y+15}" class="kpi-svg-value" style="font-size:10px">${label}</text></g>`;
   }).join('');
-  container.innerHTML = `<div class="kpi-svg-wrap"><svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">${ticks}${rows}</svg></div>`;
+  container.innerHTML=`<div class="kpi-svg-wrap"><svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel||''}">${ticks}${rows}</svg></div>`;
 }
 function renderKpis(){
-  const allPairs = filterPairsByTipo(filterPairsByText(getKpiPairs()));
-  renderKpiTipoButtons(filterPairsByText(getKpiPairs()));
-  const chartPairsLocais = filterPairsForChart(allPairs, 'local');
-  const chartPairsEquipamentos = filterPairsForChart(allPairs, 'equipamento');
-  const topLocais = countByDimension(chartPairsLocais, 'local');
-  const topEquipamentos = countByDimension(chartPairsEquipamentos, 'equipamento');
-
-  renderKpiBarChart(chartKpiLocais, topLocais, { dimension:'local', label:'local', ariaLabel:'Top 10 locais por atendimentos' });
-  renderKpiBarChart(chartKpiEquipamentos, topEquipamentos, { dimension:'equipamento', label:'equipamento', ariaLabel:'Top 10 equipamentos por atendimentos' });
-
-  const ds = kpiState.dateStart ? new Date(kpiState.dateStart) : null;
-  const de = kpiState.dateEnd   ? new Date(kpiState.dateEnd)   : null;
-  const ordensFiltered = ordens.filter(o => {
-    if(!ds && !de) return true;
-    const d = parseBRtoDate(o.data_abertura || o.data_inicio || o.data_fim);
-    if(!d) return false;
-    if(ds && d < ds) return false;
-    if(de && d > de) return false;
-    if(kpiState.tipo && normalizeKpiItem(o.tipo_manutencao) !== kpiState.tipo) return false;
+  // Filtro unificado para todos os gráficos
+  const ds=kpiState.dateStart?new Date(kpiState.dateStart):null, de=kpiState.dateEnd?new Date(kpiState.dateEnd):null;
+  const ordensFiltered=ordens.filter(o=>{
+    const d=parseBRtoDate(o.data_abertura||o.data_inicio||o.data_fim);
+    if(ds||de){ if(!d) return false; if(ds&&d<ds) return false; if(de&&d>de) return false; }
+    if(kpiState.tipo&&normalizeKpiItem(o.tipo_manutencao)!==kpiState.tipo) return false;
+    if(kpiState.text){ const q=kpiState.text.toLowerCase(); if(!`${o.local||''} ${o.equipamento||''}`.toLowerCase().includes(q)) return false; }
     return true;
   });
-  renderKpiBarChart(chartKpiOperadores, getOperadorAtendimentos(ordensFiltered), { dimension:'operador', label:'operador', ariaLabel:'Operador por atendimentos' });
-  renderKpiBarChartHH(chartKpiHH, getHomenHora(ordensFiltered), { ariaLabel:'Homem Hora por executor' });
 
-  const tipoHint = kpiState.tipo ? ` | Tipo: ${kpiState.tipo}` : '';
-  if(kpiLocaisHint) kpiLocaisHint.textContent = (kpiState.equipamento ? `Filtrado por equipamento: ${kpiState.equipamento}` : 'Todos os equipamentos') + tipoHint;
-  if(kpiEquipamentosHint) kpiEquipamentosHint.textContent = (kpiState.local ? `Filtrado por local: ${kpiState.local}` : 'Todos os locais') + tipoHint;
+  // Reconstruir pares a partir de ordensFiltered (para Top 10 respeitarem todos os filtros)
+  const seen=new Set(), pairs=[];
+  const validStatus=new Set(['ABERTA','ANDAMENTO','FINALIZADA']);
+  for(const o of ordensFiltered){
+    const status=normalizeKpiItem(o.status); if(!validStatus.has(status)) continue;
+    const id=Number(o.id_os); if(!Number.isFinite(id)) continue;
+    const locais=splitForKpi(o.local).filter(i=>i!=='SEM CADASTRO');
+    const equipamentos=splitForKpi(o.equipamento).filter(i=>i!=='SEM CADASTRO');
+    const tipo=normalizeKpiItem(o.tipo_manutencao||'');
+    for(const local of locais){ for(const equip of equipamentos){
+      const key=`${id}||${status}||${local}||${equip}||${tipo}`;
+      if(seen.has(key)) continue; seen.add(key);
+      pairs.push({local,equipamento:equip,id,status,tipo});
+    }}
+  }
+
+  renderKpiTipoButtons(pairs);
+  const locaisPairs=kpiState.equipamento?pairs.filter(p=>p.equipamento===kpiState.equipamento):pairs;
+  const equipPairs =kpiState.local?pairs.filter(p=>p.local===kpiState.local):pairs;
+  renderKpiBarChart(chartKpiLocais,countByDimension(locaisPairs,'local'),{dimension:'local',label:'local',ariaLabel:'Top 10 locais'});
+  renderKpiBarChart(chartKpiEquipamentos,countByDimension(equipPairs,'equipamento'),{dimension:'equipamento',label:'equipamento',ariaLabel:'Top 10 equipamentos'});
+
+  renderKpiCards(ordensFiltered);
+  renderKpiBarChart(chartKpiOperadores,getOperadorAtendimentos(ordensFiltered),{dimension:'operador',label:'operador',ariaLabel:'Operador por atendimentos'});
+  renderKpiBarChartHH(chartKpiHH,getHomenHora(ordensFiltered),{ariaLabel:'Homem Hora',color:'#0f6e56'});
+  renderKpiBarChartHH(chartKpiMTTR,getMTTR(ordensFiltered),{ariaLabel:'MTTR',color:'#dc2626'});
+  renderKpiBarChartHH(chartKpiMTBF,getMTBF(ordensFiltered),{ariaLabel:'MTBF',color:'#185FA5'});
+  renderKpiPieChart(chartKpiTipo,getDistribuicaoTipo(ordensFiltered));
+  renderKpiBarChartHH(chartKpiHHTipo,getHHPorTipo(ordensFiltered),{ariaLabel:'HH por tipo',color:'#7c3aed'});
+
+  const tipoHint=kpiState.tipo?` | Tipo: ${kpiState.tipo}`:'';
+  if(kpiLocaisHint) kpiLocaisHint.textContent=(kpiState.equipamento?`Filtrado por equipamento: ${kpiState.equipamento}`:'Todos os equipamentos')+tipoHint;
+  if(kpiEquipamentosHint) kpiEquipamentosHint.textContent=(kpiState.local?`Filtrado por local: ${kpiState.local}`:'Todos os locais')+tipoHint;
 }
 function handleKpiInteraction(event){
-  const tipoBtn = event.target.closest('[data-kpi-tipo]');
-  if(tipoBtn){
-    kpiState.tipo = tipoBtn.dataset.kpiTipo || null;
-    renderKpis();
-    return;
-  }
-  const target = event.target.closest('[data-kpi-dimension][data-kpi-value]');
+  const tipoBtn=event.target.closest('[data-kpi-tipo]');
+  if(tipoBtn){ kpiState.tipo=tipoBtn.dataset.kpiTipo||null; renderKpis(); return; }
+  const target=event.target.closest('[data-kpi-dimension][data-kpi-value]');
   if(!target) return;
-  const dimension = target.dataset.kpiDimension;
-  const value = target.dataset.kpiValue;
-  if(!dimension || !value) return;
-  kpiState[dimension] = kpiState[dimension] === value ? null : value;
+  const dimension=target.dataset.kpiDimension, value=target.dataset.kpiValue;
+  if(!dimension||!value) return;
+  kpiState[dimension]=kpiState[dimension]===value?null:value;
   renderKpis();
 }
 
@@ -1340,40 +1504,10 @@ function renderTable(){
     </tr>`).join('') : `<tr><td colspan="11" class="empty">Nenhuma O.S. em andamento.</td></tr>`;
 
   const totalPages = Math.max(1, Math.ceil(finalizadas.length / FINALIZADAS_PER_PAGE));
-  if(finalizadasPage >= totalPages) finalizadasPage = totalPages - 1;
-  const pageSlice = finalizadas.slice(finalizadasPage * FINALIZADAS_PER_PAGE, (finalizadasPage + 1) * FINALIZADAS_PER_PAGE);
+  if(finalizadasPage >= totalPages) finalizadasPage = 0;
 
-  tbodyFinalizadas.innerHTML = pageSlice.length ? pageSlice.map(o=>`
-    <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '')}">
-      <td>${'<span class="badge finalizada">FINALIZADA</span>'}</td>
-      <td>${PCMDB.escapeHtml(o.data_fim)}</td>
-      <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
-      <td>${o.id_os}</td>
-      <td>${PCMDB.escapeHtml(o.local)}</td>
-      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
-      <td>${PCMDB.escapeHtml(o.componente || '-')}</td>
-      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz || '-')}</span></td>
-      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '-')}</span></td>
-      <td>${PCMDB.escapeHtml((o.executores||[]).join(' / '))}</td>
-      <td>${acoes(o)}</td>
-    </tr>`).join('') : `<tr><td colspan="11" class="empty">Nenhuma O.S. finalizada.</td></tr>`;
-
-  const pagination = document.getElementById('finalizadasPagination');
-  if(pagination){
-    if(totalPages <= 1){ pagination.innerHTML = ''; }
-    else {
-      let btns = '';
-      for(let i = 0; i < totalPages; i++){
-        const start = i * FINALIZADAS_PER_PAGE + 1;
-        const end = Math.min((i + 1) * FINALIZADAS_PER_PAGE, finalizadas.length);
-        btns += `<button class="btn btn-secondary${i === finalizadasPage ? ' tab is-active' : ''}" style="padding:8px 14px;font-size:13px" type="button" data-fin-page="${i}">Página ${i+1} <span style="font-weight:400;opacity:.7">(${start}–${end})</span></button>`;
-      }
-      pagination.innerHTML = `<span style="font-size:13px;color:var(--muted)">Total: ${finalizadas.length} registros</span> ${btns}`;
-      pagination.querySelectorAll('[data-fin-page]').forEach(btn => {
-        btn.addEventListener('click', ()=>{ finalizadasPage = Number(btn.dataset.finPage); renderTable(); applyFilter(); });
-      });
-    }
-  }
+  // Delega para renderFinalizadasFiltradas que respeita o filtro de busca
+  renderFinalizadasFiltradas((searchInput.value||'').trim().toLowerCase());
   applyFilter();
 }
 async function loadAndRender(){ ordens = await PCMDB.getAllOrders(); updateTabBadges(); renderTable(); renderKpis(); }

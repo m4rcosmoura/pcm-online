@@ -218,8 +218,8 @@ tbody tr.is-pendente:hover{background:rgba(217,119,6,.13)}
 .kpi-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .kpi-panel-head label{font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.4px}
 .kpi-chart-box{flex:1;min-height:440px;display:flex;align-items:stretch}
-.kpi-svg-wrap{width:100%;overflow:auto hidden;border:none;border-radius:0;background:transparent;padding:0}
-.kpi-svg-chart{width:100%;min-width:680px;height:auto;display:block}
+.kpi-svg-wrap{width:100%;overflow-x:auto;overflow-y:hidden;border:none;border-radius:0;background:transparent;padding:0}
+.kpi-svg-chart{width:100%;min-width:480px;height:auto;display:block}
 .kpi-svg-grid{stroke:var(--line);stroke-width:1}
 .kpi-svg-axis{fill:var(--muted);font-size:11px;font-weight:700}
 .kpi-svg-label{fill:var(--text);font-size:12px;font-weight:800}
@@ -230,3 +230,11 @@ tbody tr.is-pendente:hover{background:rgba(217,119,6,.13)}
 .kpi-svg-row:hover .kpi-svg-bar,.kpi-svg-row:focus .kpi-svg-bar{opacity:.88}
 .kpi-svg-row.is-active .kpi-svg-bar{fill:#166534}
 @media (max-width: 1100px){.kpi-grid-two{grid-template-columns:1fr}.kpi-text-filter{max-width:none}}
+@media (max-width: 640px){
+  .kpi-clean-page{padding:10px;gap:10px}
+  .kpi-grid-two{gap:10px}
+  .kpi-panel{min-height:0;padding:10px}
+  .kpi-chart-box{min-height:0;flex:none}
+  .kpi-panel-head label{font-size:12px}
+  .kpi-svg-chart{min-width:340px}
+}

@@ -115,6 +115,7 @@ td.cell-wrap > span.wrap-inner {
         <tbody id="tbodyFinalizadas"></tbody>
       </table>
     </div></div>
+    <div id="finalizadasPagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap;"></div>
   </section>
 
   <section class="page" data-page="kpis">
@@ -126,16 +127,18 @@ td.cell-wrap > span.wrap-inner {
       </div>
 
       <div class="kpi-filter-row" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
-        <input id="kpiTextFilter" class="input kpi-text-filter" type="search" placeholder="Filtrar locais e equipamentos..." style="flex:1;min-width:200px">
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="kpiDateStart" class="input" type="datetime-local" style="width:185px;padding:8px 10px;font-size:13px" title="Data/hora inicial">
+        <input id="kpiTextFilter" class="input kpi-text-filter" type="search" placeholder="Filtrar locais e equipamentos..." style="flex:1;min-width:160px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          <input id="kpiDateStart" class="input" type="datetime-local" style="width:175px;padding:8px 10px;font-size:13px" title="Data/hora inicial">
           <span style="color:var(--muted);font-size:13px">até</span>
-          <input id="kpiDateEnd" class="input" type="datetime-local" style="width:185px;padding:8px 10px;font-size:13px" title="Data/hora final">
+          <input id="kpiDateEnd" class="input" type="datetime-local" style="width:175px;padding:8px 10px;font-size:13px" title="Data/hora final">
           <button id="kpiDateClear" class="btn btn-secondary" type="button" style="padding:8px 12px;font-size:12px">Limpar</button>
         </div>
       </div>
 
       <div id="kpiTipoButtons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+
+      <div id="kpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px"></div>
 
       <div class="kpi-grid-two">
         <div class="kpi-panel">
@@ -248,6 +251,7 @@ const chartKpiLocais = document.getElementById('chartKpiLocais');
 const chartKpiEquipamentos = document.getElementById('chartKpiEquipamentos');
 const chartKpiOperadores = document.getElementById('chartKpiOperadores');
 const chartKpiHH = document.getElementById('chartKpiHH');
+const kpiCards = document.getElementById('kpiCards');
 const kpiTextFilter = document.getElementById('kpiTextFilter');
 const kpiLocaisHint = document.getElementById('kpiLocaisHint');
 const kpiEquipamentosHint = document.getElementById('kpiEquipamentosHint');
@@ -289,7 +293,49 @@ const ddState = { local:{multiple:true, value:[], search:''}, equipamento:{multi
 
 function activePage(){ return document.querySelector('.page.is-visible'); }
 function showPage(key){ tabs.forEach(t=>t.classList.toggle('is-active',t.dataset.tab===key)); pages.forEach(p=>p.classList.toggle('is-visible',p.dataset.page===key)); applyFilter(); }
-function applyFilter(){ const q=(searchInput.value||'').trim().toLowerCase(); const page=activePage(); if(!page) return; page.querySelectorAll('tbody tr').forEach(tr=>{ const text=((tr.textContent||'')+' '+(tr.dataset.obs||'')).toLowerCase(); tr.style.display=text.includes(q)?'table-row':'none'; }); }
+function applyFilter(){ const q=(searchInput.value||'').trim().toLowerCase(); const page=activePage(); if(!page) return; if(page.dataset.page==='finalizadas'){ renderFinalizadasFiltradas(q); return; } page.querySelectorAll('tbody tr').forEach(tr=>{ const text=((tr.textContent||'')+' '+(tr.dataset.obs||'')).toLowerCase(); tr.style.display=text.includes(q)?'table-row':'none'; }); }
+
+const FINALIZADAS_PER_PAGE = 30;
+let finalizadasPage = 0;
+
+function renderFinalizadasFiltradas(q){
+  const finalizadas = ordens.filter(o=>o.status==='FINALIZADA');
+  const filtradas = q ? finalizadas.filter(o=>{
+    const texto=[o.data_fim,o.prioridade,String(o.id_os),o.local,o.equipamento,o.componente,o.causa_raiz,o.o_que_feito,o.observacao_fechamento,(o.executores||[]).join(' ')].join(' ').toLowerCase();
+    return texto.includes(q);
+  }) : finalizadas;
+  const totalPages=Math.max(1,Math.ceil(filtradas.length/FINALIZADAS_PER_PAGE));
+  if(finalizadasPage>=totalPages) finalizadasPage=0;
+  const pageSlice=filtradas.slice(finalizadasPage*FINALIZADAS_PER_PAGE,(finalizadasPage+1)*FINALIZADAS_PER_PAGE);
+  tbodyFinalizadas.innerHTML=pageSlice.length?pageSlice.map(o=>`
+    <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito||o.observacao_fechamento||'')}">
+      <td><span class="badge finalizada">FINALIZADA</span></td>
+      <td>${PCMDB.escapeHtml(o.data_fim)}</td>
+      <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
+      <td>${o.id_os}</td>
+      <td>${PCMDB.escapeHtml(o.local)}</td>
+      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td>${PCMDB.escapeHtml(o.componente||'-')}</td>
+      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz||'-')}</span></td>
+      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito||o.observacao_fechamento||'-')}</span></td>
+      <td><button class="action-btn btn-print" data-id="${o.id_os}" type="button" title="Imprimir" aria-label="Imprimir O.S." style="padding:6px 8px;min-width:auto">🖨️</button></td>
+    </tr>`).join(''):`<tr><td colspan="10" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
+  const pag=document.getElementById('finalizadasPagination');
+  if(pag){
+    if(totalPages<=1){ pag.innerHTML=''; }
+    else{
+      let btns='';
+      for(let i=0;i<totalPages;i++){
+        const s=i*FINALIZADAS_PER_PAGE+1, e=Math.min((i+1)*FINALIZADAS_PER_PAGE,filtradas.length);
+        btns+=`<button class="btn btn-secondary${i===finalizadasPage?' tab is-active':''}" style="padding:8px 14px;font-size:13px" type="button" data-fin-page="${i}">Página ${i+1} <span style="font-weight:400;opacity:.7">(${s}–${e})</span></button>`;
+      }
+      pag.innerHTML=`<span style="font-size:13px;color:var(--muted)">Total: ${filtradas.length} registros${q?' (filtrados)':''}</span> ${btns}`;
+      pag.querySelectorAll('[data-fin-page]').forEach(btn=>{
+        btn.addEventListener('click',()=>{ finalizadasPage=Number(btn.dataset.finPage); renderFinalizadasFiltradas(q); });
+      });
+    }
+  }
+}
 function closeAllDropdowns(){ document.querySelectorAll('.dd').forEach(el=>el.dataset.open='0'); renderDropdown('componente'); }
 function sortAlpha(items){ return [...(items || [])].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base',numeric:true})); }
 function selectedLabel(key){ const s = ddState[key]; if(s.multiple) return Array.isArray(s.value) ? s.value : []; return s.value ? [s.value] : []; }
@@ -323,7 +369,7 @@ document.addEventListener('click', (e)=>{
   if(e.target.closest('.btn-print')) printOrder(e.target.closest('.btn-print').dataset.id);
   if(!e.target.closest('.dd')) closeAllDropdowns();
 });
-document.addEventListener('input', e=>{ const el=e.target; if(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement){ if(el.type!=='date' && el.type!=='number' && el.type!=='file' && el.type!=='search'){ const start=typeof el.selectionStart==='number'?el.selectionStart:null; const end=typeof el.selectionEnd==='number'?el.selectionEnd:start; const nextValue=String(el.value||'').toUpperCase(); if(el.value!==nextValue){ el.value=nextValue; if(start!==null && document.activeElement===el){ const posStart=Math.min(nextValue.length,start); const posEnd=Math.min(nextValue.length,end ?? start); el.setSelectionRange(posStart,posEnd); } } } } if(el===searchInput) applyFilter(); if(el.matches('[data-dd-search]')){ const key=el.dataset.ddSearch; const start=typeof el.selectionStart==='number'?el.selectionStart:null; const end=typeof el.selectionEnd==='number'?el.selectionEnd:start; ddState[key].search=el.value; renderDropdown(key); const searchEl=document.querySelector(`.dd[data-dd="${key}"] .dd-search`); if(searchEl){ searchEl.focus(); if(start!==null){ const max=searchEl.value.length; searchEl.setSelectionRange(Math.min(start,max), Math.min(end ?? start,max)); } } } });
+document.addEventListener('input', e=>{ const el=e.target; if(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement){ if(el.type!=='date' && el.type!=='number' && el.type!=='file' && el.type!=='search'){ const start=typeof el.selectionStart==='number'?el.selectionStart:null; const end=typeof el.selectionEnd==='number'?el.selectionEnd:start; const nextValue=String(el.value||'').toUpperCase(); if(el.value!==nextValue){ el.value=nextValue; if(start!==null && document.activeElement===el){ const posStart=Math.min(nextValue.length,start); const posEnd=Math.min(nextValue.length,end ?? start); el.setSelectionRange(posStart,posEnd); } } } } if(el===searchInput){ finalizadasPage=0; applyFilter(); } if(el.matches('[data-dd-search]')){ const key=el.dataset.ddSearch; const start=typeof el.selectionStart==='number'?el.selectionStart:null; const end=typeof el.selectionEnd==='number'?el.selectionEnd:start; ddState[key].search=el.value; renderDropdown(key); const searchEl=document.querySelector(`.dd[data-dd="${key}"] .dd-search`); if(searchEl){ searchEl.focus(); if(start!==null){ const max=searchEl.value.length; searchEl.setSelectionRange(Math.min(start,max), Math.min(end ?? start,max)); } } } });
 
 document.getElementById('btnThemeToggle').addEventListener('click', toggleTheme);
 tabs.forEach(btn=>btn.addEventListener('click', ()=>showPage(btn.dataset.tab)));
@@ -587,6 +633,22 @@ function renderKpiTipoButtons(pairs){
   const tipoBtns = tipos.map(t => `<button class="btn ${kpiState.tipo===t ? '' : 'btn-secondary'}" type="button" data-kpi-tipo="${PCMDB.escapeHtml(t)}" style="padding:6px 12px;font-size:12px;font-weight:700">${PCMDB.escapeHtml(t)}</button>`).join('');
   kpiTipoButtons.innerHTML = `<span style="font-size:12px;font-weight:700;color:var(--muted);align-self:center">Tipo:</span> ${allBtn}${tipoBtns}`;
 }
+function renderKpiCards(ordensFiltered){
+  if(!kpiCards) return;
+  const fin=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='FINALIZADA');
+  const ab=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ABERTA');
+  const and=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ANDAMENTO');
+  const pend=ordensFiltered.filter(o=>o.pendente);
+  const total=ordensFiltered.length;
+  const cards=[
+    {label:'Total de O.S.',value:total,color:'#185FA5'},
+    {label:'Abertas',value:ab.length,color:'#2563eb'},
+    {label:'Em andamento',value:and.length,color:'#f59e0b'},
+    {label:'Finalizadas',value:fin.length,color:'#16a34a'},
+    {label:'Pendentes',value:pend.length,color:'#d97706'},
+  ];
+  kpiCards.innerHTML=cards.map(c=>`<div style="background:var(--surface-alt);border:1px solid var(--panel-border);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${c.label}</div><div style="font-size:26px;font-weight:900;color:${c.color};line-height:1">${c.value}</div></div>`).join('');
+}
 function renderKpiBarChart(container, items, config){
   if(!container) return;
   if(!items.length){
@@ -723,6 +785,7 @@ function renderKpis(){
   });
   renderKpiBarChart(chartKpiOperadores, getOperadorAtendimentos(ordensFiltered), { dimension:'operador', label:'operador', ariaLabel:'Operador por atendimentos' });
   renderKpiBarChartHH(chartKpiHH, getHomenHora(ordensFiltered), { ariaLabel:'Homem Hora por executor' });
+  renderKpiCards(ordensFiltered);
   const tipoHint = kpiState.tipo ? ` | Tipo: ${kpiState.tipo}` : '';
   if(kpiLocaisHint) kpiLocaisHint.textContent = (kpiState.equipamento ? `Filtrado por equipamento: ${kpiState.equipamento}` : 'Todos os equipamentos') + tipoHint;
   if(kpiEquipamentosHint) kpiEquipamentosHint.textContent = (kpiState.local ? `Filtrado por local: ${kpiState.local}` : 'Todos os locais') + tipoHint;
@@ -786,19 +849,8 @@ function renderTables(){
       <td>${PCMDB.elapsedHHMM(o.data_inicio)}</td>
       <td style="display:flex;gap:6px;align-items:center"><button class="action-btn action-finish btn-finish" data-id="${o.id_os}" type="button">Finalizar</button><button class="action-btn btn-print" data-id="${o.id_os}" type="button" title="Imprimir" aria-label="Imprimir O.S." style="padding:6px 8px;min-width:auto">🖨️</button></td>
     </tr>`).join('') : `<tr><td colspan="10" class="empty">Nenhuma O.S. em andamento.</td></tr>`;
-  tbodyFinalizadas.innerHTML = finalizadas.length ? finalizadas.map(o=>`
-    <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '')}">
-      <td><span class="badge finalizada">FINALIZADA</span></td>
-      <td>${PCMDB.escapeHtml(o.data_fim)}</td>
-      <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
-      <td>${o.id_os}</td>
-      <td>${PCMDB.escapeHtml(o.local)}</td>
-      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
-      <td>${PCMDB.escapeHtml(o.componente || '-')}</td>
-      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz || '-')}</span></td>
-      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '-')}</span></td>
-      <td><button class="action-btn btn-print" data-id="${o.id_os}" type="button" title="Imprimir" aria-label="Imprimir O.S." style="padding:6px 8px;min-width:auto">🖨️</button></td>
-    </tr>`).join('') : `<tr><td colspan="10" class="empty">Nenhuma O.S. finalizada.</td></tr>`;
+  tbodyFinalizadas.innerHTML = '';
+  renderFinalizadasFiltradas((searchInput.value||'').trim().toLowerCase());
   applyFilter();
 }
 async function loadAndRender(){ ordens = await PCMDB.getAllOrders(); updateTabBadges(); renderTables(); renderKpis(); }
