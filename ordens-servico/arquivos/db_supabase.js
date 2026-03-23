@@ -181,7 +181,7 @@ async function addOrder(data, silent=false){
   const ordem = {
     id_os: Number(next),
     status:'ABERTA',
-    data_abertura: nowBR(),
+    data_abertura: data.data_abertura || nowBR(),
     data_inicio:'',
     data_fim:'',
     prioridade:data.prioridade,
@@ -273,12 +273,14 @@ function notifyChange(){
   }
 }
 function onExternalChange(cb){
+  const ctrl = { _paused: false, pause(){ this._paused = true; }, resume(){ this._paused = false; } };
   if(channel){
     channel.onmessage = (event)=>{
-      if(event?.data?.type === 'changed') cb?.();
+      if(event?.data?.type === 'changed' && !ctrl._paused) cb?.();
     };
   }
-  setInterval(()=>cb?.(), POLL_INTERVAL_MS);
+  setInterval(()=>{ if(!ctrl._paused) cb?.(); }, POLL_INTERVAL_MS);
+  return ctrl;
 }
 
 window.PCMDB = {

@@ -11,9 +11,22 @@
 
 <link rel="stylesheet" href="styles.css">
 <style>
-.table-wrap{max-width:100%;overflow:auto;}
-.table-wrap table{width:max-content;min-width:max-content;table-layout:auto;}
-.table-wrap th,.table-wrap td{white-space:nowrap;}
+.table-wrap { overflow-x: auto; overflow-y: auto; width: 100%; }
+table { table-layout: auto; white-space: nowrap; }
+td.cell-wrap {
+  white-space: normal !important;
+  word-break: break-word;
+  min-width: 180px;
+  max-width: 260px;
+}
+td.cell-wrap > span.wrap-inner {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+}
 </style>
 <script src="config.js"></script>
 <script src="db_supabase.js"></script>
@@ -32,12 +45,9 @@
 <body>
 <main class="wrap">
   <h1 class="title">PCM - Ordens de Serviço</h1>
-  <div class="status-note">Tela de planejamento e controle. Cria a O.S. e acompanha o fluxo.</div>
 
   <div class="toolbar">
     <button id="btnNewOS" class="btn" type="button">+ Nova OS</button>
-    <button id="btnExportBackup" class="btn btn-secondary" type="button">Exportar backup</button>
-    <button id="btnImportBackup" class="btn btn-secondary" type="button">Importar backup</button>
     <button id="btnThemeToggle" class="btn btn-secondary theme-toggle" type="button" aria-pressed="false">🌙 Tema escuro</button>
     <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
     <input id="searchInput" class="search" type="search" placeholder="Buscar na aba atual...">
@@ -56,18 +66,16 @@
     <div class="card"><div class="table-wrap">
       <table>
         <thead><tr>
-          <th style="width:120px">Status</th>
-          <th style="width:150px">Data/Hora</th>
-          <th style="width:90px">Prioridade</th>
-          <th style="width:70px">O.S.</th>
-          <th style="width:90px">Origem</th>
-          <th style="width:140px">Local</th>
+          <th>Status</th>
+          <th>Data/Hora</th>
+          <th>Prioridade</th>
+          <th>O.S.</th>
+          <th>Local</th>
           <th>Equipamento</th>
-          <th style="width:170px">Tipo Manutenção</th>
-          <th style="width:170px">Executores</th>
-          <th style="width:130px">Solicitante</th>
-          <th style="width:170px">Observação</th>
-          <th style="width:90px">Ações</th>
+          <th>Tipo Manutenção</th>
+          <th>Executores</th>
+          <th>Solicitante</th>
+          <th>Ações</th>
         </tr></thead>
         <tbody id="tbodyAbertas"></tbody>
       </table>
@@ -78,18 +86,17 @@
     <div class="card"><div class="table-wrap">
       <table>
         <thead><tr>
-          <th style="width:120px">Status</th>
-          <th style="width:150px">Início</th>
-          <th style="width:90px">Prioridade</th>
-          <th style="width:70px">O.S.</th>
-          <th style="width:90px">Origem</th>
-          <th style="width:140px">Local</th>
+          <th>Status</th>
+          <th>Início</th>
+          <th>Prioridade</th>
+          <th>O.S.</th>
+          <th>Local</th>
           <th>Equipamento</th>
-          <th style="width:170px">Tipo Manutenção</th>
-          <th style="width:170px">Executores</th>
-          <th style="width:130px">Solicitante</th>
-          <th style="width:100px">Tempo</th>
-          <th style="width:90px">Ações</th>
+          <th>Tipo Manutenção</th>
+          <th>Executores</th>
+          <th>Solicitante</th>
+          <th>Tempo</th>
+          <th>Ações</th>
         </tr></thead>
         <tbody id="tbodyAndamento"></tbody>
       </table>
@@ -100,23 +107,22 @@
     <div class="card"><div class="table-wrap">
       <table>
         <thead><tr>
-          <th style="width:120px">Status</th>
-          <th style="width:150px">Fim</th>
-          <th style="width:90px">Prioridade</th>
-          <th style="width:70px">O.S.</th>
-          <th style="width:90px">Origem</th>
-          <th style="width:140px">Local</th>
-          <th style="width:180px">Equipamento</th>
-          <th style="width:160px">Componente</th>
-          <th style="width:200px">Causa raiz</th>
-          <th style="width:180px">Executores</th>
-          <th style="width:200px">O que foi feito</th>
-          <th>O que faltava</th>
-          <th style="width:90px">Ações</th>
+          <th>Status</th>
+          <th>Fim</th>
+          <th>Prioridade</th>
+          <th>O.S.</th>
+          <th>Local</th>
+          <th>Equipamento</th>
+          <th>Componente</th>
+          <th>Causa Raiz</th>
+          <th>O que foi feito</th>
+          <th>Executores</th>
+          <th>Ações</th>
         </tr></thead>
         <tbody id="tbodyFinalizadas"></tbody>
       </table>
     </div></div>
+    <div id="finalizadasPagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap;"></div>
   </section>
 
   <section class="page" data-page="cadastros">
@@ -203,9 +209,17 @@
         </div>
       </div>
 
-      <div class="kpi-filter-row">
-        <input id="kpiTextFilter" class="input kpi-text-filter" type="search" placeholder="Filtrar locais e equipamentos...">
+      <div class="kpi-filter-row" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
+        <input id="kpiTextFilter" class="input kpi-text-filter" type="search" placeholder="Filtrar locais e equipamentos..." style="flex:1;min-width:200px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="kpiDateStart" class="input" type="datetime-local" style="width:185px;padding:8px 10px;font-size:13px" title="Data/hora inicial">
+          <span style="color:var(--muted);font-size:13px">até</span>
+          <input id="kpiDateEnd" class="input" type="datetime-local" style="width:185px;padding:8px 10px;font-size:13px" title="Data/hora final">
+          <button id="kpiDateClear" class="btn btn-secondary" type="button" style="padding:8px 12px;font-size:12px">Limpar</button>
+        </div>
       </div>
+
+      <div id="kpiTipoButtons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
 
       <div class="kpi-grid-two">
         <div class="kpi-panel">
@@ -222,6 +236,22 @@
             <span id="kpiEquipamentosHint" class="muted">Todos os locais</span>
           </div>
           <div id="chartKpiEquipamentos" class="kpi-chart-box" aria-label="Gráfico Top 10 equipamentos"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>Operador × Atendimentos</label>
+            <span class="muted">Total de O.S. por executor</span>
+          </div>
+          <div id="chartKpiOperadores" class="kpi-chart-box" aria-label="Gráfico Operador por atendimentos"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>Homem × Hora</label>
+            <span class="muted">Horas trabalhadas por executor (O.S. finalizadas)</span>
+          </div>
+          <div id="chartKpiHH" class="kpi-chart-box" aria-label="Gráfico Homem Hora"></div>
         </div>
       </div>
 
@@ -240,6 +270,8 @@
         <div class="field"><label>Tipo de manutenção <span class="req">*</span></label><div class="dd" data-dd="tipo"></div></div>
         <div class="field"><label>Executores <span class="req">*</span></label><div class="dd" data-dd="executores"></div></div>
         <div class="field"><label for="fSolicitante">Solicitante <span class="req">*</span></label><input id="fSolicitante" class="input" type="text" placeholder="Digite o nome do solicitante"></div>
+        <div class="field"><label for="fComponente2">Componente <span class="req">*</span></label><div class="dd" data-dd="componente"></div></div>
+        <div class="field"><label for="fDataAbertura">Data/Hora de abertura <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label><input id="fDataAbertura" class="input" type="datetime-local"></div>
         <div class="field" style="grid-column:1/-1"><label for="fObs">Observação da abertura</label><textarea id="fObs" class="textarea" placeholder="Descreva o problema, sintoma ou instrução inicial"></textarea></div>
       </div>
       <div id="editStatusRow" style="display:none; margin-top:12px; padding:12px; border:1px solid var(--panel-border); border-radius:12px; background:var(--surface-alt)">
@@ -268,7 +300,7 @@
 <div id="tooltip" class="tooltip"></div>
 
 <script>
-let lists = { prioridade:[], local:[], equipamento:[], tipo:[], executores:[], componente:[], solicitante:[], tipo_manutencao:[] }, ordens = [];
+let lists, ordens = [];
 const tabs = document.querySelectorAll('.tab');
 const pages = document.querySelectorAll('.page');
 const searchInput = document.getElementById('searchInput');
@@ -277,10 +309,15 @@ const tbodyAndamento = document.getElementById('tbodyAndamento');
 const tbodyFinalizadas = document.getElementById('tbodyFinalizadas');
 const chartKpiLocais = document.getElementById('chartKpiLocais');
 const chartKpiEquipamentos = document.getElementById('chartKpiEquipamentos');
+const chartKpiOperadores = document.getElementById('chartKpiOperadores');
+const chartKpiHH = document.getElementById('chartKpiHH');
 const kpiTextFilter = document.getElementById('kpiTextFilter');
 const kpiLocaisHint = document.getElementById('kpiLocaisHint');
 const kpiEquipamentosHint = document.getElementById('kpiEquipamentosHint');
-const kpiState = { local: null, equipamento: null, text: '' };
+const kpiTipoButtons = document.getElementById('kpiTipoButtons');
+const kpiDateStart = document.getElementById('kpiDateStart');
+const kpiDateEnd = document.getElementById('kpiDateEnd');
+const kpiState = { local: null, equipamento: null, text: '', tipo: null, dateStart: '', dateEnd: '' };
 const modalBackdrop = document.getElementById('modalBackdrop');
 const tooltip = document.getElementById('tooltip');
 let currentRow = null;
@@ -357,8 +394,28 @@ function applyFilter(){
   });
 }
 
-function closeModal(){ modalBackdrop.classList.remove('is-open'); editingOrderId = null; document.getElementById('modalTitle').textContent='Nova Ordem de Serviço'; document.getElementById('btnSaveOS').textContent='Salvar'; document.getElementById('fObs').value=''; document.getElementById('fSolicitante').value=''; document.getElementById('fCausaRaiz').value=''; document.getElementById('fOQueFeito').value=''; document.getElementById('fOQueFalta').value=''; document.getElementById('editFinalFields').style.display='none'; document.getElementById('editStatusRow').style.display='none'; document.getElementById('fStatus').value='ABERTA'; resetDropdowns(); renderAllDropdowns(); closeAllDropdowns(); }
-function openModal(){ modalBackdrop.classList.add('is-open'); closeAllDropdowns(); }
+function closeModal(){
+  modalBackdrop.classList.remove('is-open');
+  editingOrderId = null;
+  document.getElementById('modalTitle').textContent='Nova Ordem de Serviço';
+  document.getElementById('btnSaveOS').textContent='Salvar';
+  document.getElementById('fObs').value='';
+  document.getElementById('fSolicitante').value='';
+  document.getElementById('fCausaRaiz').value='';
+  document.getElementById('fOQueFeito').value='';
+  document.getElementById('fOQueFalta').value='';
+  document.getElementById('fDataAbertura').value='';
+  document.getElementById('editFinalFields').style.display='none';
+  document.getElementById('editStatusRow').style.display='none';
+  document.getElementById('fStatus').value='ABERTA';
+  resetDropdowns(); renderAllDropdowns(); closeAllDropdowns();
+  if(window._pollController) window._pollController.resume();
+}
+function openModal(){
+  modalBackdrop.classList.add('is-open');
+  closeAllDropdowns();
+  if(window._pollController) window._pollController.pause();
+}
 
 function resetDropdowns(){ Object.keys(ddState).forEach(k=>{ ddState[k].search=''; ddState[k].value = ddState[k].multiple ? [] : null; }); }
 function sortAlpha(items){ return [...(items || [])].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base',numeric:true})); }
@@ -608,6 +665,13 @@ document.getElementById('btnCancelModal').addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', e=>{ if(e.target===modalBackdrop) closeModal(); });
 
 document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
+  const dataAberturaInput = document.getElementById('fDataAbertura').value;
+  let dataAbertura = '';
+  if(dataAberturaInput){
+    const d = new Date(dataAberturaInput);
+    const pad2 = n => String(n).padStart(2,'0');
+    dataAbertura = `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
   const payload = {
     prioridade: ddState.prioridade.value,
     local: joinMultiValue(ddState.local.value),
@@ -619,9 +683,11 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
     componente: joinMultiValue(ddState.componente.value),
     causa_raiz: document.getElementById('fCausaRaiz').value.trim(),
     o_que_feito: document.getElementById('fOQueFeito').value.trim(),
-    o_que_falta: document.getElementById('fOQueFalta').value.trim()
+    o_que_falta: document.getElementById('fOQueFalta').value.trim(),
+    data_abertura: dataAbertura
   };
   if(!payload.prioridade || !payload.local || !payload.equipamento || !payload.tipo_manutencao || !payload.executores.length || !payload.solicitante){ alert('Preencha os campos obrigatórios.'); return; }
+  if(!editingOrderId && !payload.componente){ alert('O campo Componente é obrigatório.'); return; }
   if(editingOrderId){
     if(!askConfirmation(`Tem certeza que deseja salvar as alterações da O.S. ${editingOrderId}?`)) return;
     const ordem = await PCMDB.getOrder(editingOrderId);
@@ -643,6 +709,7 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
     ordem.executores = [...payload.executores];
     ordem.solicitante = payload.solicitante;
     ordem.observacao_abertura = payload.observacao_abertura;
+    if(payload.data_abertura) ordem.data_abertura = payload.data_abertura;
     if(ordem.status === 'FINALIZADA'){
       ordem.componente = payload.componente || '';
       ordem.causa_raiz = payload.causa_raiz || '';
@@ -660,12 +727,6 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
   showPage('abertas');
 });
 
-document.getElementById('btnExportBackup').addEventListener('click', async ()=>{
-  const data = await PCMDB.exportBackup();
-  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `backup_ordens_${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href);
-});
-document.getElementById('btnImportBackup').addEventListener('click', ()=> document.getElementById('backupFileInput').click());
 document.getElementById('btnExportReport').addEventListener('click', exportSelectedReport);
 
 document.getElementById('backupFileInput').addEventListener('change', async (e)=>{
@@ -860,29 +921,39 @@ function splitForKpi(value){
   const items = splitMultiValue(value).map(normalizeKpiItem).filter(Boolean);
   return items.length ? items : ['SEM CADASTRO'];
 }
+function parseBRtoDate(str){
+  if(!str) return null;
+  const m = String(str).match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if(!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0));
+}
 function getKpiPairs(){
   const pairs = [];
   const seen = new Set();
   const validStatus = new Set(['ABERTA','ANDAMENTO','FINALIZADA']);
+  const ds = kpiState.dateStart ? new Date(kpiState.dateStart) : null;
+  const de = kpiState.dateEnd   ? new Date(kpiState.dateEnd)   : null;
   for(const order of (Array.isArray(ordens) ? ordens : [])){
     const status = normalizeKpiItem(order?.status);
     if(!validStatus.has(status)) continue;
     const id = Number(order?.id_os);
     if(!Number.isFinite(id)) continue;
+    if(ds || de){
+      const d = parseBRtoDate(order.data_abertura || order.data_inicio || order.data_fim);
+      if(!d) continue;
+      if(ds && d < ds) continue;
+      if(de && d > de) continue;
+    }
     const locais = splitForKpi(order?.local).filter(item => item !== 'SEM CADASTRO');
     const equipamentos = splitForKpi(order?.equipamento).filter(item => item !== 'SEM CADASTRO');
     if(!locais.length || !equipamentos.length) continue;
+    const tipo = normalizeKpiItem(order?.tipo_manutencao || '');
     for(const local of locais){
       for(const equipamento of equipamentos){
-        const key = `${id}||${status}||${local}||${equipamento}||${normalizeKpiItem(order?.tipo_manutencao || '')}`;
+        const key = `${id}||${status}||${local}||${equipamento}||${tipo}`;
         if(seen.has(key)) continue;
         seen.add(key);
-        pairs.push({
-          local,
-          equipamento,
-          id,
-          status,
-        });
+        pairs.push({ local, equipamento, id, status, tipo });
       }
     }
   }
@@ -904,7 +975,10 @@ function filterPairsByText(pairs){
   if(!q) return pairs;
   return pairs.filter(pair => `${pair.local} ${pair.equipamento}`.toLowerCase().includes(q));
 }
-
+function filterPairsByTipo(pairs){
+  if(!kpiState.tipo) return pairs;
+  return pairs.filter(pair => pair.tipo === kpiState.tipo);
+}
 function filterPairsForChart(pairs, dimension){
   if(dimension === 'local' && kpiState.equipamento){
     return pairs.filter(item => item.equipamento === kpiState.equipamento);
@@ -917,8 +991,15 @@ function filterPairsForChart(pairs, dimension){
 function filterPairsForSelection(pairs){
   return pairs.filter(item => (!kpiState.local || item.local === kpiState.local) && (!kpiState.equipamento || item.equipamento === kpiState.equipamento));
 }
-function shortKpiLabel(label, limit = 24){
+function shortKpiLabel(label, limit = 22){
   return label.length > limit ? `${label.slice(0, limit - 1)}…` : label;
+}
+function renderKpiTipoButtons(pairs){
+  if(!kpiTipoButtons) return;
+  const tipos = [...new Set(pairs.map(p => p.tipo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR',{sensitivity:'base'}));
+  const allBtn = `<button class="btn ${!kpiState.tipo ? '' : 'btn-secondary'}" type="button" data-kpi-tipo="" style="padding:6px 12px;font-size:12px;font-weight:700">Todos</button>`;
+  const tipoBtns = tipos.map(t => `<button class="btn ${kpiState.tipo===t ? '' : 'btn-secondary'}" type="button" data-kpi-tipo="${PCMDB.escapeHtml(t)}" style="padding:6px 12px;font-size:12px;font-weight:700">${PCMDB.escapeHtml(t)}</button>`).join('');
+  kpiTipoButtons.innerHTML = `<span style="font-size:12px;font-weight:700;color:var(--muted);align-self:center">Tipo:</span> ${allBtn}${tipoBtns}`;
 }
 
 function printableField(value, fallback='—'){
@@ -1054,12 +1135,12 @@ function renderKpiBarChart(container, items, config){
     container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>';
     return;
   }
-  const barHeight = 28;
-  const gap = 14;
-  const topPad = 24;
-  const rightPad = 80;
-  const bottomPad = 18;
-  const leftPad = 180;
+  const barHeight = 22;
+  const gap = 10;
+  const topPad = 20;
+  const rightPad = 50;
+  const bottomPad = 14;
+  const leftPad = 160;
   const width = 760;
   const chartWidth = width - leftPad - rightPad;
   const height = topPad + bottomPad + items.length * (barHeight + gap);
@@ -1069,8 +1150,8 @@ function renderKpiBarChart(container, items, config){
     const x = leftPad + Math.round((chartWidth / 4) * index);
     return `
       <g>
-        <line x1="${x}" y1="${topPad - 8}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line>
-        <text x="${x}" y="${topPad - 12}" text-anchor="middle" class="kpi-svg-axis">${value}</text>
+        <line x1="${x}" y1="${topPad - 6}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line>
+        <text x="${x}" y="${topPad - 8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}</text>
       </g>`;
   }).join('');
 
@@ -1085,10 +1166,10 @@ function renderKpiBarChart(container, items, config){
     return `
       <g class="kpi-svg-row ${isActive ? 'is-active' : ''}" data-kpi-dimension="${config.dimension}" data-kpi-value="${fullLabel}" tabindex="0" role="button" aria-label="Filtrar ${config.label} ${fullLabel}">
         <title>${title}</title>
-        <text x="${leftPad - 12}" y="${y + 18}" text-anchor="end" class="kpi-svg-label">${shortLabel}</text>
-        <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="8" class="kpi-svg-track"></rect>
-        <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="8" class="kpi-svg-bar"></rect>
-        <text x="${leftPad + barWidth + 10}" y="${y + 18}" class="kpi-svg-value">${item.total}</text>
+        <text x="${leftPad - 8}" y="${y + 15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text>
+        <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect>
+        <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar"></rect>
+        <text x="${leftPad + barWidth + 6}" y="${y + 15}" class="kpi-svg-value" style="font-size:10px">${item.total}</text>
       </g>`;
   }).join('');
 
@@ -1100,19 +1181,119 @@ function renderKpiBarChart(container, items, config){
       </svg>
     </div>`;
 }
+function getOperadorAtendimentos(ordensFiltered){
+  const totals = new Map();
+  for(const o of ordensFiltered){
+    const execs = Array.isArray(o.executores) ? o.executores : splitMultiValue(o.executores);
+    for(const ex of execs){
+      const nome = normalizeKpiItem(ex);
+      if(!nome) continue;
+      totals.set(nome, (totals.get(nome) || 0) + 1);
+    }
+  }
+  return [...totals.entries()]
+    .map(([nome, total]) => ({ nome, total }))
+    .sort((a,b) => b.total - a.total || a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}))
+    .slice(0, 10);
+}
+function getHomenHora(ordensFiltered){
+  const totals = new Map();
+  for(const o of ordensFiltered){
+    if(String(o.status||'').toUpperCase() !== 'FINALIZADA') continue;
+    const inicio = parseBRtoDate(o.data_inicio);
+    const fim    = parseBRtoDate(o.data_fim);
+    if(!inicio || !fim || fim <= inicio) continue;
+    const horas = (fim - inicio) / 3600000;
+    const execs = Array.isArray(o.executores) ? o.executores : splitMultiValue(o.executores);
+    for(const ex of execs){
+      const nome = normalizeKpiItem(ex);
+      if(!nome) continue;
+      totals.set(nome, (totals.get(nome) || 0) + horas);
+    }
+  }
+  return [...totals.entries()]
+    .map(([nome, total]) => ({ nome, total: Math.round(total * 10) / 10 }))
+    .sort((a,b) => b.total - a.total || a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}))
+    .slice(0, 10);
+}
+function renderKpiBarChartHH(container, items, config){
+  if(!container) return;
+  if(!items.length){
+    container.innerHTML = '<div class="empty">Sem dados para este recorte.</div>';
+    return;
+  }
+  const barHeight = 22;
+  const gap = 10;
+  const topPad = 20;
+  const rightPad = 60;
+  const bottomPad = 14;
+  const leftPad = 160;
+  const width = 760;
+  const chartWidth = width - leftPad - rightPad;
+  const height = topPad + bottomPad + items.length * (barHeight + gap);
+  const max = Math.max(...items.map(item => item.total), 1);
+  const ticks = Array.from({length: 5}, (_, index)=>{
+    const value = Math.round((max / 4) * index * 10) / 10;
+    const x = leftPad + Math.round((chartWidth / 4) * index);
+    return `<g>
+      <line x1="${x}" y1="${topPad - 6}" x2="${x}" y2="${height - bottomPad + 4}" class="kpi-svg-grid"></line>
+      <text x="${x}" y="${topPad - 8}" text-anchor="middle" class="kpi-svg-axis" style="font-size:9px">${value}h</text>
+    </g>`;
+  }).join('');
+  const rows = items.map((item, index)=>{
+    const y = topPad + index * (barHeight + gap);
+    const barWidth = Math.max(10, Math.round((item.total / max) * chartWidth));
+    const shortLabel = PCMDB.escapeHtml(shortKpiLabel(item.nome));
+    const fullLabel = PCMDB.escapeHtml(item.nome);
+    const hh = Math.floor(item.total);
+    const mm = Math.round((item.total - hh) * 60);
+    const label = `${hh}h${mm > 0 ? String(mm).padStart(2,'0') + 'm' : ''}`;
+    return `<g class="kpi-svg-row" tabindex="0" role="img" aria-label="${fullLabel}: ${label}">
+      <title>${PCMDB.escapeHtml(item.nome)}: ${label}</title>
+      <text x="${leftPad - 8}" y="${y + 15}" text-anchor="end" class="kpi-svg-label" style="font-size:10px">${shortLabel}</text>
+      <rect x="${leftPad}" y="${y}" width="${chartWidth}" height="${barHeight}" rx="6" class="kpi-svg-track"></rect>
+      <rect x="${leftPad}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" class="kpi-svg-bar" style="fill:#0f6e56"></rect>
+      <text x="${leftPad + barWidth + 6}" y="${y + 15}" class="kpi-svg-value" style="font-size:10px">${label}</text>
+    </g>`;
+  }).join('');
+  container.innerHTML = `<div class="kpi-svg-wrap"><svg viewBox="0 0 ${width} ${height}" class="kpi-svg-chart" role="img" aria-label="${config.ariaLabel}">${ticks}${rows}</svg></div>`;
+}
 function renderKpis(){
-  const pairs = filterPairsByText(getKpiPairs());
-  const chartPairsLocais = filterPairsForChart(pairs, 'local');
-  const chartPairsEquipamentos = filterPairsForChart(pairs, 'equipamento');
+  const allPairs = filterPairsByTipo(filterPairsByText(getKpiPairs()));
+  renderKpiTipoButtons(filterPairsByText(getKpiPairs()));
+  const chartPairsLocais = filterPairsForChart(allPairs, 'local');
+  const chartPairsEquipamentos = filterPairsForChart(allPairs, 'equipamento');
   const topLocais = countByDimension(chartPairsLocais, 'local');
   const topEquipamentos = countByDimension(chartPairsEquipamentos, 'equipamento');
 
   renderKpiBarChart(chartKpiLocais, topLocais, { dimension:'local', label:'local', ariaLabel:'Top 10 locais por atendimentos' });
   renderKpiBarChart(chartKpiEquipamentos, topEquipamentos, { dimension:'equipamento', label:'equipamento', ariaLabel:'Top 10 equipamentos por atendimentos' });
-  if(kpiLocaisHint) kpiLocaisHint.textContent = kpiState.equipamento ? `Filtrado por equipamento: ${kpiState.equipamento}` : 'Todos os equipamentos';
-  if(kpiEquipamentosHint) kpiEquipamentosHint.textContent = kpiState.local ? `Filtrado por local: ${kpiState.local}` : 'Todos os locais';
+
+  const ds = kpiState.dateStart ? new Date(kpiState.dateStart) : null;
+  const de = kpiState.dateEnd   ? new Date(kpiState.dateEnd)   : null;
+  const ordensFiltered = ordens.filter(o => {
+    if(!ds && !de) return true;
+    const d = parseBRtoDate(o.data_abertura || o.data_inicio || o.data_fim);
+    if(!d) return false;
+    if(ds && d < ds) return false;
+    if(de && d > de) return false;
+    if(kpiState.tipo && normalizeKpiItem(o.tipo_manutencao) !== kpiState.tipo) return false;
+    return true;
+  });
+  renderKpiBarChart(chartKpiOperadores, getOperadorAtendimentos(ordensFiltered), { dimension:'operador', label:'operador', ariaLabel:'Operador por atendimentos' });
+  renderKpiBarChartHH(chartKpiHH, getHomenHora(ordensFiltered), { ariaLabel:'Homem Hora por executor' });
+
+  const tipoHint = kpiState.tipo ? ` | Tipo: ${kpiState.tipo}` : '';
+  if(kpiLocaisHint) kpiLocaisHint.textContent = (kpiState.equipamento ? `Filtrado por equipamento: ${kpiState.equipamento}` : 'Todos os equipamentos') + tipoHint;
+  if(kpiEquipamentosHint) kpiEquipamentosHint.textContent = (kpiState.local ? `Filtrado por local: ${kpiState.local}` : 'Todos os locais') + tipoHint;
 }
 function handleKpiInteraction(event){
+  const tipoBtn = event.target.closest('[data-kpi-tipo]');
+  if(tipoBtn){
+    kpiState.tipo = tipoBtn.dataset.kpiTipo || null;
+    renderKpis();
+    return;
+  }
   const target = event.target.closest('[data-kpi-dimension][data-kpi-value]');
   if(!target) return;
   const dimension = target.dataset.kpiDimension;
@@ -1122,55 +1303,79 @@ function handleKpiInteraction(event){
   renderKpis();
 }
 
+const FINALIZADAS_PER_PAGE = 30;
+let finalizadasPage = 0;
+
 function renderTable(){
   const abertas = ordens.filter(o=>o.status==='ABERTA');
   const andamento = ordens.filter(o=>o.status==='ANDAMENTO');
   const finalizadas = ordens.filter(o=>o.status==='FINALIZADA');
-  const origemCell = o => o.os_origem ? `<span style="font-weight:800;color:#d97706" title="Continuação da O.S. #${o.os_origem}">#${o.os_origem}</span>` : '<span class="muted">—</span>';
   const acoes = o => `<div class="action-group"><button class="btn-icon" type="button" data-os-print="${o.id_os}" title="Imprimir O.S.">🖨️</button><button class="btn-icon btn-icon-edit" type="button" data-os-edit="${o.id_os}" title="Editar O.S.">✏️</button><button class="btn-icon btn-icon-delete" type="button" data-os-delete="${o.id_os}" title="Excluir O.S.">🗑️</button></div>`;
+
   tbodyAbertas.innerHTML = abertas.length ? abertas.map(o=>`
     <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.observacao_abertura || '')}" class="${o.pendente ? 'is-pendente' : ''}">
       <td>${o.pendente ? '<span class="badge pendente">🔄 PENDENTE</span>' : '<span class="badge aberta">ABERTA</span>'}</td>
       <td>${PCMDB.escapeHtml(o.data_abertura)}</td>
       <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
       <td>${o.id_os}</td>
-      <td>${origemCell(o)}</td>
-      <td>${PCMDB.escapeHtml(o.local)}</td><td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td>${PCMDB.escapeHtml(o.local)}</td>
+      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
       <td>${PCMDB.escapeHtml(o.tipo_manutencao)}</td>
       <td>${o.executores?.length ? PCMDB.escapeHtml(o.executores.join(' / ')) : '<span style="color:#d97706;font-weight:800">⚠️ A definir</span>'}</td>
       <td>${PCMDB.escapeHtml(o.solicitante)}</td>
-      <td class="obs-cell">${o.o_que_falta ? '⚠️ Passar mouse' : (o.observacao_abertura ? 'Passar mouse' : '-')}</td>
       <td>${acoes(o)}</td>
-    </tr>`).join('') : `<tr><td colspan="12" class="empty">Nenhuma O.S. aberta.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="10" class="empty">Nenhuma O.S. aberta.</td></tr>`;
+
   tbodyAndamento.innerHTML = andamento.length ? andamento.map(o=>`
     <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.observacao_abertura || '')}" class="${o.pendente ? 'is-pendente' : ''}">
       <td><span class="badge andamento">ANDAMENTO</span></td>
       <td>${PCMDB.escapeHtml(o.data_inicio)}</td>
       <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
       <td>${o.id_os}</td>
-      <td>${origemCell(o)}</td>
-      <td>${PCMDB.escapeHtml(o.local)}</td><td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td>${PCMDB.escapeHtml(o.local)}</td>
+      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
       <td>${PCMDB.escapeHtml(o.tipo_manutencao)}</td>
       <td>${PCMDB.escapeHtml((o.executores||[]).join(' / '))}</td>
       <td>${PCMDB.escapeHtml(o.solicitante)}</td>
       <td>${PCMDB.elapsedHHMM(o.data_inicio)}</td>
       <td>${acoes(o)}</td>
-    </tr>`).join('') : `<tr><td colspan="12" class="empty">Nenhuma O.S. em andamento.</td></tr>`;
-  tbodyFinalizadas.innerHTML = finalizadas.length ? finalizadas.map(o=>`
+    </tr>`).join('') : `<tr><td colspan="11" class="empty">Nenhuma O.S. em andamento.</td></tr>`;
+
+  const totalPages = Math.max(1, Math.ceil(finalizadas.length / FINALIZADAS_PER_PAGE));
+  if(finalizadasPage >= totalPages) finalizadasPage = totalPages - 1;
+  const pageSlice = finalizadas.slice(finalizadasPage * FINALIZADAS_PER_PAGE, (finalizadasPage + 1) * FINALIZADAS_PER_PAGE);
+
+  tbodyFinalizadas.innerHTML = pageSlice.length ? pageSlice.map(o=>`
     <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '')}">
-      <td><span class="badge finalizada">FINALIZADA</span></td>
+      <td>${'<span class="badge finalizada">FINALIZADA</span>'}</td>
       <td>${PCMDB.escapeHtml(o.data_fim)}</td>
       <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
       <td>${o.id_os}</td>
-      <td>${origemCell(o)}</td>
-      <td>${PCMDB.escapeHtml(o.local)}</td><td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td>${PCMDB.escapeHtml(o.local)}</td>
+      <td>${PCMDB.escapeHtml(o.equipamento)}</td>
       <td>${PCMDB.escapeHtml(o.componente || '-')}</td>
-      <td>${PCMDB.escapeHtml(o.causa_raiz || '-')}</td>
+      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz || '-')}</span></td>
+      <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '-')}</span></td>
       <td>${PCMDB.escapeHtml((o.executores||[]).join(' / '))}</td>
-      <td>${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '-')}</td>
-      <td>${o.o_que_falta ? PCMDB.escapeHtml(o.o_que_falta) : '<span class="muted">—</span>'}</td>
       <td>${acoes(o)}</td>
-    </tr>`).join('') : `<tr><td colspan="13" class="empty">Nenhuma O.S. finalizada.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="11" class="empty">Nenhuma O.S. finalizada.</td></tr>`;
+
+  const pagination = document.getElementById('finalizadasPagination');
+  if(pagination){
+    if(totalPages <= 1){ pagination.innerHTML = ''; }
+    else {
+      let btns = '';
+      for(let i = 0; i < totalPages; i++){
+        const start = i * FINALIZADAS_PER_PAGE + 1;
+        const end = Math.min((i + 1) * FINALIZADAS_PER_PAGE, finalizadas.length);
+        btns += `<button class="btn btn-secondary${i === finalizadasPage ? ' tab is-active' : ''}" style="padding:8px 14px;font-size:13px" type="button" data-fin-page="${i}">Página ${i+1} <span style="font-weight:400;opacity:.7">(${start}–${end})</span></button>`;
+      }
+      pagination.innerHTML = `<span style="font-size:13px;color:var(--muted)">Total: ${finalizadas.length} registros</span> ${btns}`;
+      pagination.querySelectorAll('[data-fin-page]').forEach(btn => {
+        btn.addEventListener('click', ()=>{ finalizadasPage = Number(btn.dataset.finPage); renderTable(); applyFilter(); });
+      });
+    }
+  }
   applyFilter();
 }
 async function loadAndRender(){ ordens = await PCMDB.getAllOrders(); updateTabBadges(); renderTable(); renderKpis(); }
@@ -1215,6 +1420,14 @@ chartKpiEquipamentos?.addEventListener('click', handleKpiInteraction);
 chartKpiLocais?.addEventListener('keydown', (event)=>{ if(event.key==='Enter' || event.key===' '){ event.preventDefault(); handleKpiInteraction(event); } });
 chartKpiEquipamentos?.addEventListener('keydown', (event)=>{ if(event.key==='Enter' || event.key===' '){ event.preventDefault(); handleKpiInteraction(event); } });
 kpiTextFilter?.addEventListener('input', ()=>{ kpiState.text = kpiTextFilter.value || ''; renderKpis(); });
+kpiTipoButtons?.addEventListener('click', handleKpiInteraction);
+kpiDateStart?.addEventListener('change', ()=>{ kpiState.dateStart = kpiDateStart.value || ''; renderKpis(); });
+kpiDateEnd?.addEventListener('change', ()=>{ kpiState.dateEnd = kpiDateEnd.value || ''; renderKpis(); });
+document.getElementById('kpiDateClear')?.addEventListener('click', ()=>{
+  kpiState.dateStart = ''; kpiState.dateEnd = '';
+  kpiDateStart.value = ''; kpiDateEnd.value = '';
+  renderKpis();
+});
 
 (async function init(){
   applyTheme(readStoredTheme());
@@ -1224,7 +1437,7 @@ kpiTextFilter?.addEventListener('input', ()=>{ kpiState.text = kpiTextFilter.val
   renderCadastros();
   renderCadastroSearchResults();
   await loadAndRender();
-  PCMDB.subscribeChanges(async ()=>{
+  window._pollController = PCMDB.subscribeChanges(async ()=>{
     lists = await PCMDB.getLists();
     renderAllDropdowns();
     renderCadastros();
@@ -1232,6 +1445,20 @@ kpiTextFilter?.addEventListener('input', ()=>{ kpiState.text = kpiTextFilter.val
     await loadAndRender();
   });
 })();
+
+function ajustarAlturaTabelas(){
+  const tableWraps = document.querySelectorAll('.table-wrap');
+  tableWraps.forEach(wrap => {
+    const rect = wrap.getBoundingClientRect();
+    const page = wrap.closest('.page');
+    const fator = (page && page.dataset.page === 'finalizadas') ? 0.75 : 0.9;
+    const espacoDisponivel = (window.innerHeight - rect.top - 16) * fator;
+    wrap.style.maxHeight = Math.max(200, espacoDisponivel) + 'px';
+  });
+}
+window.addEventListener('resize', ajustarAlturaTabelas);
+document.addEventListener('DOMContentLoaded', ajustarAlturaTabelas);
+setTimeout(ajustarAlturaTabelas, 300);
 </script>
 </body>
 </html>
