@@ -216,18 +216,18 @@ async function updateOrder(ordem, silent=false){
   if(!silent) notifyChange();
   return rows && rows[0] ? rows[0] : ordem;
 }
-async function startOrder(id){
+async function startOrder(id, dataInicio){
   const ordem = await getOrder(id);
   if(!ordem) throw new Error('OS não encontrada.');
   ordem.status = 'ANDAMENTO';
-  ordem.data_inicio = nowBR();
+  ordem.data_inicio = dataInicio || nowBR();
   return updateOrder(ordem);
 }
 async function finishOrder(id, payload={}){
   const ordem = await getOrder(id);
   if(!ordem) throw new Error('OS não encontrada.');
   ordem.status = payload.status || 'FINALIZADA';
-  ordem.data_fim = nowBR();
+  ordem.data_fim = payload.data_fim || nowBR();
   ordem.causa_raiz = payload.causa_raiz || ordem.causa_raiz || '';
   ordem.componente = payload.componente || ordem.componente || '';
   ordem.observacao_fechamento = payload.observacao_fechamento || ordem.observacao_fechamento || '';

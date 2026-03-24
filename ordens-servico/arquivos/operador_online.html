@@ -8,6 +8,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Operador - Ordens de Serviço</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Poppins:wght@600;700;900&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="styles.css">
 <style>
@@ -103,10 +106,12 @@ td.cell-wrap > span.wrap-inner {
         <thead><tr>
           <th>Status</th>
           <th>Fim</th>
+          <th>Duração</th>
           <th>Prioridade</th>
           <th>O.S.</th>
           <th>Local</th>
           <th>Equipamento</th>
+          <th>Tipo</th>
           <th>Componente</th>
           <th>Causa Raiz</th>
           <th>O que foi feito</th>
@@ -181,7 +186,13 @@ td.cell-wrap > span.wrap-inner {
 <div id="confirmBackdrop" class="modal-backdrop" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header"><div class="modal-title">Iniciar O.S.</div><button id="btnCloseConfirm" class="icon-btn" type="button">×</button></div>
-    <div class="modal-body"><div id="confirmBody" class="summary-box"></div></div>
+    <div class="modal-body">
+      <div id="confirmBody" class="summary-box"></div>
+      <div class="field" style="margin-top:14px">
+        <label for="fDataInicio">Data/Hora de início <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label>
+        <input id="fDataInicio" class="input" type="datetime-local">
+      </div>
+    </div>
     <div class="modal-footer"><button id="btnCancelConfirm" class="btn btn-secondary" type="button">Cancelar</button><button id="btnConfirmStart" class="btn" type="button">Confirmar início</button></div>
   </div>
 </div>
@@ -220,6 +231,10 @@ td.cell-wrap > span.wrap-inner {
           <textarea id="fCausa" class="textarea" placeholder="Descreva a causa raiz"></textarea>
         </div>
         <div class="field">
+          <label for="fDataFim">Data/Hora de finalização <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label>
+          <input id="fDataFim" class="input" type="datetime-local">
+        </div>
+        <div class="field">
           <label>Local</label>
           <div class="dd" data-dd="local"></div>
         </div>
@@ -228,7 +243,7 @@ td.cell-wrap > span.wrap-inner {
           <div class="dd" data-dd="equipamento"></div>
         </div>
         <div class="field">
-          <label>Componente</label>
+          <label>Componente <span class="req">*</span></label>
           <div class="dd" data-dd="componente"></div>
         </div>
       </div>
@@ -265,15 +280,15 @@ const tooltip = document.getElementById('tooltip');
 let currentRow = null;
 const THEME_STORAGE_KEY = 'pcm_theme';
 function readStoredTheme(){
-  try { return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'; }
-  catch(_){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+  try { const s = localStorage.getItem(THEME_STORAGE_KEY); return s === 'light' ? 'light' : 'dark'; }
+  catch(_){ return 'dark'; }
 }
 function applyTheme(theme){
-  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', nextTheme);
   const btn = document.getElementById('btnThemeToggle');
   if(btn){
-    btn.textContent = nextTheme === 'dark' ? '☀️ Tema claro' : '🌙 Tema escuro';
+    btn.textContent = nextTheme === 'dark' ? '☀️ Modo claro' : '🌙 Modo escuro';
     btn.setAttribute('aria-pressed', nextTheme === 'dark' ? 'true' : 'false');
   }
 }
@@ -298,6 +313,15 @@ function applyFilter(){ const q=(searchInput.value||'').trim().toLowerCase(); co
 const FINALIZADAS_PER_PAGE = 30;
 let finalizadasPage = 0;
 
+function duracaoHHMM(inicio, fim){
+  if(!inicio || !fim) return '-';
+  const s = parseBRtoDate(inicio), e = parseBRtoDate(fim);
+  if(!s || !e || e <= s) return '-';
+  const mins = Math.round((e - s) / 60000);
+  const hh = Math.floor(mins / 60), mm = mins % 60;
+  return `${hh}h${String(mm).padStart(2,'0')}m`;
+}
+
 function renderFinalizadasFiltradas(q){
   const finalizadas = ordens.filter(o=>o.status==='FINALIZADA');
   const filtradas = q ? finalizadas.filter(o=>{
@@ -310,16 +334,18 @@ function renderFinalizadasFiltradas(q){
   tbodyFinalizadas.innerHTML=pageSlice.length?pageSlice.map(o=>`
     <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito||o.observacao_fechamento||'')}">
       <td><span class="badge finalizada">FINALIZADA</span></td>
-      <td>${PCMDB.escapeHtml(o.data_fim)}</td>
+      <td style="white-space:nowrap">${PCMDB.escapeHtml(o.data_fim||'-')}</td>
+      <td style="white-space:nowrap;color:var(--muted);font-size:12px">${duracaoHHMM(o.data_inicio, o.data_fim)}</td>
       <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
       <td>${o.id_os}</td>
       <td>${PCMDB.escapeHtml(o.local)}</td>
       <td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td style="white-space:nowrap;font-size:12px">${PCMDB.escapeHtml(o.tipo_manutencao||'-')}</td>
       <td>${PCMDB.escapeHtml(o.componente||'-')}</td>
       <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz||'-')}</span></td>
       <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito||o.observacao_fechamento||'-')}</span></td>
       <td><button class="action-btn btn-print" data-id="${o.id_os}" type="button" title="Imprimir" aria-label="Imprimir O.S." style="padding:6px 8px;min-width:auto">🖨️</button></td>
-    </tr>`).join(''):`<tr><td colspan="10" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
+    </tr>`).join(''):`<tr><td colspan="12" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
   const pag=document.getElementById('finalizadasPagination');
   if(pag){
     if(totalPages<=1){ pag.innerHTML=''; }
@@ -380,7 +406,20 @@ document.getElementById('btnCloseClose').addEventListener('click', closeCloseMod
 document.getElementById('btnCancelClose').addEventListener('click', closeCloseModal);
 closeBackdrop.addEventListener('click', e=>{ if(e.target===closeBackdrop) closeCloseModal(); });
 
-document.getElementById('btnConfirmStart').addEventListener('click', async ()=>{ if(!rowToStart) return; await PCMDB.startOrder(rowToStart.id_os); closeConfirm(); await loadAndRender(); showPage('andamento'); });
+document.getElementById('btnConfirmStart').addEventListener('click', async ()=>{
+  if(!rowToStart) return;
+  const dataInicioInput = document.getElementById('fDataInicio').value;
+  let dataInicioManual = '';
+  if(dataInicioInput){
+    const d = new Date(dataInicioInput);
+    const p = n => String(n).padStart(2,'0');
+    dataInicioManual = `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  await PCMDB.startOrder(rowToStart.id_os, dataInicioManual || undefined);
+  closeConfirm();
+  await loadAndRender();
+  showPage('andamento');
+});
 document.getElementById('btnEncerrar').addEventListener('click', async ()=>{ try {
   if(!rowToClose) return;
 
@@ -389,10 +428,18 @@ document.getElementById('btnEncerrar').addEventListener('click', async ()=>{ try
   const causa_raiz = document.getElementById('fCausa').value.trim();
   const o_que_feito = document.getElementById('fOQueFeito').value.trim();
   const o_que_falta = document.getElementById('fOQueFalta').value.trim();
+  const dataFimInput = document.getElementById('fDataFim').value;
+  let dataFimManual = '';
+  if(dataFimInput){
+    const d = new Date(dataFimInput);
+    const p = n => String(n).padStart(2,'0');
+    dataFimManual = `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
 
   if(!conclusao){ alert('Indique se o serviço foi concluído ou não.'); return; }
   if(!o_que_feito){ alert('Informe o que foi feito neste turno.'); return; }
   if(conclusao === 'nao' && !o_que_falta){ alert('Informe o que falta / próximos passos.'); return; }
+  if(!ddState.componente.value.length){ alert('O campo Componente é obrigatório.'); return; }
 
   const localFinal = joinMultiValue(ddState.local.value) || rowToClose.local || '';
   const equipamentoFinal = joinMultiValue(ddState.equipamento.value) || rowToClose.equipamento || '';
@@ -412,7 +459,8 @@ document.getElementById('btnEncerrar').addEventListener('click', async ()=>{ try
     causa_raiz,
     componente: componenteFinal,
     o_que_feito,
-    o_que_falta: conclusao === 'nao' ? o_que_falta : ''
+    o_que_falta: conclusao === 'nao' ? o_que_falta : '',
+    data_fim: dataFimManual || undefined
   });
 
   // Se não concluiu, abre uma NOVA ordem em ABERTA, sem executores.
@@ -447,13 +495,19 @@ document.querySelectorAll('input[name="conclusao"]').forEach(radio => {
     document.getElementById('labelPendente').style.borderColor = isPendente ? '#f59e0b' : 'var(--field-border)';
   });
 });
-function closeConfirm(){ confirmBackdrop.classList.remove('is-open'); rowToStart=null; if(window._pollController) window._pollController.resume(); }
+function closeConfirm(){
+  confirmBackdrop.classList.remove('is-open');
+  rowToStart=null;
+  document.getElementById('fDataInicio').value='';
+  if(window._pollController) window._pollController.resume();
+}
 function closeCloseModal(){
   closeBackdrop.classList.remove('is-open');
   rowToClose=null;
   document.getElementById('fCausa').value='';
   document.getElementById('fOQueFeito').value='';
   document.getElementById('fOQueFalta').value='';
+  document.getElementById('fDataFim').value='';
   document.getElementById('fOQueFaltaWrap').style.display='none';
   document.getElementById('rConcluido').checked=false;
   document.getElementById('rPendente').checked=false;

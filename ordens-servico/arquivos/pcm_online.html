@@ -8,6 +8,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PCM - Ordens de Serviço</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Poppins:wght@600;700;900&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="styles.css">
 <style>
@@ -109,10 +112,12 @@ td.cell-wrap > span.wrap-inner {
         <thead><tr>
           <th>Status</th>
           <th>Fim</th>
+          <th>Duração</th>
           <th>Prioridade</th>
           <th>O.S.</th>
           <th>Local</th>
           <th>Equipamento</th>
+          <th>Tipo</th>
           <th>Componente</th>
           <th>Causa Raiz</th>
           <th>O que foi feito</th>
@@ -308,13 +313,23 @@ td.cell-wrap > span.wrap-inner {
         <div class="field" style="grid-column:1/-1"><label for="fObs">Observação da abertura</label><textarea id="fObs" class="textarea" placeholder="Descreva o problema, sintoma ou instrução inicial"></textarea></div>
       </div>
       <div id="editStatusRow" style="display:none; margin-top:12px; padding:12px; border:1px solid var(--panel-border); border-radius:12px; background:var(--surface-alt)">
-        <div class="field">
-          <label for="fStatus">Status da O.S.</label>
-          <select id="fStatus" class="input" style="margin-top:4px">
-            <option value="ABERTA">🔵 Aberta</option>
-            <option value="ANDAMENTO">🟡 Em andamento</option>
-            <option value="FINALIZADA">🟢 Finalizada</option>
-          </select>
+        <div class="form-grid">
+          <div class="field">
+            <label for="fStatus">Status da O.S.</label>
+            <select id="fStatus" class="input" style="margin-top:4px">
+              <option value="ABERTA">🔵 Aberta</option>
+              <option value="ANDAMENTO">🟡 Em andamento</option>
+              <option value="FINALIZADA">🟢 Finalizada</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fDataInicio">Data/Hora de início <span style="font-size:10px;color:var(--muted);font-weight:400">(deixe em branco para manter)</span></label>
+            <input id="fDataInicio" class="input" type="datetime-local">
+          </div>
+          <div class="field">
+            <label for="fDataFim">Data/Hora de fim <span style="font-size:10px;color:var(--muted);font-weight:400">(deixe em branco para manter)</span></label>
+            <input id="fDataFim" class="input" type="datetime-local">
+          </div>
         </div>
       </div>
       <div id="editFinalFields" style="display:none; margin-top:8px">
@@ -361,15 +376,15 @@ const tooltip = document.getElementById('tooltip');
 let currentRow = null;
 const THEME_STORAGE_KEY = 'pcm_theme';
 function readStoredTheme(){
-  try { return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'; }
-  catch(_){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+  try { const s = localStorage.getItem(THEME_STORAGE_KEY); return s === 'light' ? 'light' : 'dark'; }
+  catch(_){ return 'dark'; }
 }
 function applyTheme(theme){
-  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', nextTheme);
   const btn = document.getElementById('btnThemeToggle');
   if(btn){
-    btn.textContent = nextTheme === 'dark' ? '☀️ Tema claro' : '🌙 Tema escuro';
+    btn.textContent = nextTheme === 'dark' ? '☀️ Modo claro' : '🌙 Modo escuro';
     btn.setAttribute('aria-pressed', nextTheme === 'dark' ? 'true' : 'false');
   }
 }
@@ -438,6 +453,15 @@ function applyFilter(){
   });
 }
 
+function duracaoHHMM(inicio, fim){
+  if(!inicio || !fim) return '-';
+  const s = parseBRtoDate(inicio), e = parseBRtoDate(fim);
+  if(!s || !e || e <= s) return '-';
+  const mins = Math.round((e - s) / 60000);
+  const hh = Math.floor(mins / 60), mm = mins % 60;
+  return `${hh}h${String(mm).padStart(2,'0')}m`;
+}
+
 function renderFinalizadasFiltradas(q){
   const finalizadas = ordens.filter(o=>o.status==='FINALIZADA');
   const filtradas = q ? finalizadas.filter(o=>{
@@ -453,17 +477,19 @@ function renderFinalizadasFiltradas(q){
   tbodyFinalizadas.innerHTML = pageSlice.length ? pageSlice.map(o=>`
     <tr data-id="${o.id_os}" data-obs="${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '')}">
       <td><span class="badge finalizada">FINALIZADA</span></td>
-      <td>${PCMDB.escapeHtml(o.data_fim)}</td>
+      <td style="white-space:nowrap">${PCMDB.escapeHtml(o.data_fim || '-')}</td>
+      <td style="white-space:nowrap;color:var(--muted);font-size:12px">${duracaoHHMM(o.data_inicio, o.data_fim)}</td>
       <td><span class="pill ${PCMDB.priorityClass(o.prioridade)}">${PCMDB.escapeHtml(o.prioridade)}</span></td>
       <td>${o.id_os}</td>
       <td>${PCMDB.escapeHtml(o.local)}</td>
       <td>${PCMDB.escapeHtml(o.equipamento)}</td>
+      <td style="white-space:nowrap;font-size:12px">${PCMDB.escapeHtml(o.tipo_manutencao || '-')}</td>
       <td>${PCMDB.escapeHtml(o.componente || '-')}</td>
       <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.causa_raiz || '-')}</span></td>
       <td class="cell-wrap"><span class="wrap-inner">${PCMDB.escapeHtml(o.o_que_feito || o.observacao_fechamento || '-')}</span></td>
       <td>${PCMDB.escapeHtml((o.executores||[]).join(' / '))}</td>
       <td>${acoes(o)}</td>
-    </tr>`).join('') : `<tr><td colspan="11" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="13" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
 
   const pagination = document.getElementById('finalizadasPagination');
   if(pagination){
@@ -494,6 +520,8 @@ function closeModal(){
   document.getElementById('fOQueFeito').value='';
   document.getElementById('fOQueFalta').value='';
   document.getElementById('fDataAbertura').value='';
+  document.getElementById('fDataInicio').value='';
+  document.getElementById('fDataFim').value='';
   document.getElementById('editFinalFields').style.display='none';
   document.getElementById('editStatusRow').style.display='none';
   document.getElementById('fStatus').value='ABERTA';
@@ -621,6 +649,14 @@ async function updateCadastroValue(){
   await loadAndRender();
 }
 function cancelCadastroEdit(){ editingCadastroIndex = -1; document.getElementById('cadEditBox').style.display='none'; document.getElementById('cadEditBox').innerHTML=''; }
+function brToDatetimeLocal(brStr){
+  // "DD/MM/YYYY HH:MM" → "YYYY-MM-DDTHH:MM"
+  if(!brStr) return '';
+  const m = String(brStr).match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if(!m) return '';
+  const [,dd,mm,yyyy,hh='00',min='00'] = m;
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
 function openEditOrder(id){
   const ordem = ordens.find(o => String(o.id_os) === String(id));
   if(!ordem) return;
@@ -638,9 +674,11 @@ function openEditOrder(id){
   document.getElementById('fCausaRaiz').value = ordem.causa_raiz || '';
   document.getElementById('fOQueFeito').value = ordem.o_que_feito || ordem.observacao_fechamento || '';
   document.getElementById('fOQueFalta').value = ordem.o_que_falta || '';
-  // Status field
+  // Status e datas
   const fStatus = document.getElementById('fStatus');
   fStatus.value = ordem.status || 'ABERTA';
+  document.getElementById('fDataInicio').value = brToDatetimeLocal(ordem.data_inicio);
+  document.getElementById('fDataFim').value = brToDatetimeLocal(ordem.data_fim);
   document.getElementById('editStatusRow').style.display = 'block';
   document.getElementById('editFinalFields').style.display = (fStatus.value === 'FINALIZADA') ? 'block' : 'none';
   renderAllDropdowns();
@@ -775,6 +813,16 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
     o_que_falta: document.getElementById('fOQueFalta').value.trim(),
     data_abertura: dataAbertura
   };
+  // Converter datetime-local → formato BR para data_inicio e data_fim
+  function dtLocalToBR(val){
+    if(!val) return '';
+    const d = new Date(val);
+    const p = n => String(n).padStart(2,'0');
+    return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  const dataInicioEdit = dtLocalToBR(document.getElementById('fDataInicio').value);
+  const dataFimEdit    = dtLocalToBR(document.getElementById('fDataFim').value);
+
   if(!payload.prioridade || !payload.local || !payload.equipamento || !payload.tipo_manutencao || !payload.executores.length || !payload.solicitante){ alert('Preencha os campos obrigatórios.'); return; }
   if(editingOrderId){
     if(!askConfirmation(`Tem certeza que deseja salvar as alterações da O.S. ${editingOrderId}?`)) return;
@@ -785,11 +833,14 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
       if(novoStatus === 'ANDAMENTO' && !ordem.data_inicio) ordem.data_inicio = PCMDB.nowBR();
       if(novoStatus === 'FINALIZADA'){
         if(!ordem.data_inicio) ordem.data_inicio = PCMDB.nowBR();
-        ordem.data_fim = PCMDB.nowBR();
+        if(!ordem.data_fim) ordem.data_fim = PCMDB.nowBR();
       }
       if(novoStatus === 'ABERTA'){ ordem.data_inicio = ''; ordem.data_fim = ''; }
       ordem.status = novoStatus;
     }
+    // Aplicar datas manuais se preenchidas (sobrepõem a lógica automática)
+    if(dataInicioEdit) ordem.data_inicio = dataInicioEdit;
+    if(dataFimEdit)    ordem.data_fim    = dataFimEdit;
     ordem.prioridade = payload.prioridade;
     ordem.local = payload.local;
     ordem.equipamento = payload.equipamento;
@@ -973,12 +1024,16 @@ function isFinishedOrder(order){
 }
 function equipmentHistory(order){
   const equipamento = String(order?.equipamento || '').trim().toUpperCase();
-  const sameEquipment = ordens
-    .filter(o => isFinishedOrder(o) && String(o.equipamento || '').trim().toUpperCase() === equipamento)
+  const local = String(order?.local || '').trim().toUpperCase();
+  const sameCombo = ordens
+    .filter(o => isFinishedOrder(o)
+      && String(o.equipamento || '').trim().toUpperCase() === equipamento
+      && String(o.local || '').trim().toUpperCase() === local)
     .sort((a,b)=> (parseBRDate(attendanceDateFor(b))?.getTime() || 0) - (parseBRDate(attendanceDateFor(a))?.getTime() || 0));
   return {
-    total: sameEquipment.length,
-    datas: [...new Set(sameEquipment.map(o => attendanceDateFor(o)).filter(Boolean))]
+    total: sameCombo.length,
+    chave: `${equipamento} — ${local}`,
+    datas: [...new Set(sameCombo.map(o => attendanceDateFor(o)).filter(Boolean))]
   };
 }
 function buildTooltipHtml(order, obsText){
@@ -995,7 +1050,7 @@ function buildTooltipHtml(order, obsText){
     <div class="tooltip-text">${PCMDB.escapeHtml(obsText || '-')}</div>
     ${faltaHtml}
     <div class="tooltip-divider"></div>
-    <div class="tooltip-title">Histórico do equipamento</div>
+    <div class="tooltip-title">Histórico: ${PCMDB.escapeHtml(history.chave)}</div>
     <div class="tooltip-meta"><b>Total de O.S. finalizadas:</b> ${history.total}</div>
     <div class="tooltip-meta"><b>Datas registradas:</b></div>
     <ul class="tooltip-list">${datesHtml}</ul>
