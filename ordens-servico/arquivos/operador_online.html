@@ -292,7 +292,7 @@ window.addEventListener('storage', (event)=>{
 const ddState = { local:{multiple:true, value:[], search:''}, equipamento:{multiple:true, value:[], search:''}, componente:{multiple:true, value:[], search:''} };
 
 function activePage(){ return document.querySelector('.page.is-visible'); }
-function showPage(key){ tabs.forEach(t=>t.classList.toggle('is-active',t.dataset.tab===key)); pages.forEach(p=>p.classList.toggle('is-visible',p.dataset.page===key)); applyFilter(); }
+function showPage(key){ tabs.forEach(t=>t.classList.toggle('is-active',t.dataset.tab===key)); pages.forEach(p=>p.classList.toggle('is-visible',p.dataset.page===key)); if(key==='kpis') setTimeout(renderKpis,50); applyFilter(); }
 function applyFilter(){ const q=(searchInput.value||'').trim().toLowerCase(); const page=activePage(); if(!page) return; if(page.dataset.page==='finalizadas'){ renderFinalizadasFiltradas(q); return; } page.querySelectorAll('tbody tr').forEach(tr=>{ const text=((tr.textContent||'')+' '+(tr.dataset.obs||'')).toLowerCase(); tr.style.display=text.includes(q)?'table-row':'none'; }); }
 
 const FINALIZADAS_PER_PAGE = 30;
@@ -714,7 +714,9 @@ function getHomenHora(ordensFiltered){
     .slice(0, 10);
 }
 function kpiChartWidth(container){
-  return Math.max(260, (container.clientWidth || container.offsetWidth || 400));
+  const panel = container.closest('.kpi-panel') || container.closest('.kpi-chart-box') || container;
+  const w = panel.clientWidth || panel.offsetWidth || container.clientWidth || container.offsetWidth;
+  return Math.max(260, w - 28);
 }
 function renderKpiBarChartHH(container, items, config){
   if(!container) return;

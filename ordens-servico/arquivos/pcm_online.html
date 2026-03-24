@@ -304,7 +304,6 @@ td.cell-wrap > span.wrap-inner {
         <div class="field"><label>Tipo de manutenção <span class="req">*</span></label><div class="dd" data-dd="tipo"></div></div>
         <div class="field"><label>Executores <span class="req">*</span></label><div class="dd" data-dd="executores"></div></div>
         <div class="field"><label for="fSolicitante">Solicitante <span class="req">*</span></label><input id="fSolicitante" class="input" type="text" placeholder="Digite o nome do solicitante"></div>
-        <div class="field"><label for="fComponente2">Componente <span class="req">*</span></label><div class="dd" data-dd="componente"></div></div>
         <div class="field"><label for="fDataAbertura">Data/Hora de abertura <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label><input id="fDataAbertura" class="input" type="datetime-local"></div>
         <div class="field" style="grid-column:1/-1"><label for="fObs">Observação da abertura</label><textarea id="fObs" class="textarea" placeholder="Descreva o problema, sintoma ou instrução inicial"></textarea></div>
       </div>
@@ -420,6 +419,7 @@ function showPage(key){
   tabs.forEach(t=>t.classList.toggle('is-active',t.dataset.tab===key));
   pages.forEach(p=>p.classList.toggle('is-visible',p.dataset.page===key));
   searchInput.placeholder = key==='cadastros' ? 'Busca disponível nas abas de ordens...' : 'Buscar na aba atual...';
+  if(key==='kpis') setTimeout(renderKpis, 50);
   applyFilter();
 }
 function applyFilter(){
@@ -776,7 +776,6 @@ document.getElementById('btnSaveOS').addEventListener('click', async ()=>{
     data_abertura: dataAbertura
   };
   if(!payload.prioridade || !payload.local || !payload.equipamento || !payload.tipo_manutencao || !payload.executores.length || !payload.solicitante){ alert('Preencha os campos obrigatórios.'); return; }
-  if(!editingOrderId && !payload.componente){ alert('O campo Componente é obrigatório.'); return; }
   if(editingOrderId){
     if(!askConfirmation(`Tem certeza que deseja salvar as alterações da O.S. ${editingOrderId}?`)) return;
     const ordem = await PCMDB.getOrder(editingOrderId);
@@ -1232,8 +1231,10 @@ function printOrder(ordem){
 }
 
 function kpiChartWidth(container){
-  // Mede a largura real disponível; fallback 400 se ainda não renderizado
-  return Math.max(260, (container.clientWidth || container.offsetWidth || 400));
+  // Sobe até o painel pai para medir a largura real disponível
+  const panel = container.closest('.kpi-panel') || container.closest('.kpi-chart-box') || container;
+  const w = panel.clientWidth || panel.offsetWidth || container.clientWidth || container.offsetWidth;
+  return Math.max(260, w - 28); // 28px de padding interno do painel
 }
 function renderKpiBarChart(container, items, config){
   if(!container) return;

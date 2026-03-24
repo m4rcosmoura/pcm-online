@@ -219,7 +219,7 @@ tbody tr.is-pendente:hover{background:rgba(217,119,6,.13)}
 .kpi-panel-head label{font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.4px}
 .kpi-chart-box{flex:1;min-height:440px;display:flex;align-items:stretch}
 .kpi-svg-wrap{width:100%;overflow-x:auto;overflow-y:hidden;border:none;border-radius:0;background:transparent;padding:0}
-.kpi-svg-chart{width:100%;min-width:480px;height:auto;display:block}
+.kpi-svg-chart{width:100%;max-width:100%;height:auto;display:block}
 .kpi-svg-grid{stroke:var(--line);stroke-width:1}
 .kpi-svg-axis{fill:var(--muted);font-size:11px;font-weight:700}
 .kpi-svg-label{fill:var(--text);font-size:12px;font-weight:800}
