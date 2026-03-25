@@ -692,14 +692,12 @@ function renderKpiCards(ordensFiltered){
   const fin=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='FINALIZADA');
   const ab=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ABERTA');
   const and=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ANDAMENTO');
-  const pend=ordensFiltered.filter(o=>o.pendente);
   const total=ordensFiltered.length;
   const cards=[
     {label:'Total de O.S.',value:total,color:'#185FA5'},
     {label:'Abertas',value:ab.length,color:'#2563eb'},
     {label:'Em andamento',value:and.length,color:'#f59e0b'},
     {label:'Finalizadas',value:fin.length,color:'#16a34a'},
-    {label:'Pendentes',value:pend.length,color:'#d97706'},
   ];
   kpiCards.innerHTML=cards.map(c=>`<div style="background:var(--surface-alt);border:1px solid var(--panel-border);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${c.label}</div><div style="font-size:26px;font-weight:900;color:${c.color};line-height:1">${c.value}</div></div>`).join('');
 }

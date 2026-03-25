@@ -1399,19 +1399,17 @@ function renderKpiCards(ordensFiltered){
   const fin=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='FINALIZADA');
   const ab=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ABERTA');
   const and=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='ANDAMENTO');
-  const pend=ordensFiltered.filter(o=>o.pendente);
   const corr=ordensFiltered.filter(o=>normalizeKpiItem(o.tipo_manutencao)==='CORRETIVA');
   const total=ordensFiltered.length;
   const pctCorr=total?Math.round((corr.length/total)*100):0;
   let mttrGeral='-';
   const corrFin=fin.filter(o=>normalizeKpiItem(o.tipo_manutencao)==='CORRETIVA');
-  if(corrFin.length){ let soma=0,cnt=0; for(const o of corrFin){ const s=parseBRtoDate(o.data_inicio),e=parseBRtoDate(o.data_fim); if(s&&e&&e>s){soma+=(e-s)/3600000;cnt++;} } if(cnt) mttrGeral=(Math.round((soma/cnt)*10)/10)+'h'; }
+  if(corrFin.length){ let soma=0,cnt=0; for(const o of corrFin){ const s=parseBRtoDate(o.data_inicio),e=parseBRtoDate(o.data_fim); if(s&&e&&e>s){soma+=(e-s)/3600000;cnt++;} } if(cnt){ const totalMin=Math.round((soma/cnt)*60); const hh=Math.floor(totalMin/60); const mm=totalMin%60; mttrGeral=hh+'h '+(mm<10?'0':'')+mm+'min'; } }
   const cards=[
     {label:'Total de O.S.',value:total,color:'#185FA5'},
     {label:'Abertas',value:ab.length,color:'#2563eb'},
     {label:'Em andamento',value:and.length,color:'#f59e0b'},
     {label:'Finalizadas',value:fin.length,color:'#16a34a'},
-    {label:'Pendentes',value:pend.length,color:'#d97706'},
     {label:'% Corretiva',value:pctCorr+'%',color:pctCorr>60?'#dc2626':'#185FA5'},
     {label:'MTTR Geral',value:mttrGeral,color:'#0f6e56'},
   ];
