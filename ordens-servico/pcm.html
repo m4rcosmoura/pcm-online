@@ -450,6 +450,53 @@ function duracaoHHMM(inicio, fim){
   return `${hh}h${String(mm).padStart(2,'0')}m`;
 }
 
+
+/* Gera a paginação estilo "‹ 1 2 ... 5 6 7 ... 172 173 ›"
+   Mostra sempre: primeira, última, atual e 2 vizinhas de cada lado.
+   Reticências aparecem quando há gap entre os grupos. */
+function buildPagination(current, total, q, filteredLen, paginationEl, onPageClick){
+  if(!paginationEl) return;
+  if(total <= 1){ paginationEl.innerHTML = ''; return; }
+
+  /* Decide quais páginas mostrar */
+  const show = new Set();
+  show.add(0);
+  show.add(total - 1);
+  for(let i = Math.max(0, current - 2); i <= Math.min(total - 1, current + 2); i++) show.add(i);
+  const pages = [...show].sort((a,b) => a - b);
+
+  const btnBase = 'style="padding:6px 10px;font-size:13px;min-width:36px;border-radius:6px;border:1.5px solid var(--field-border);background:var(--surface-alt);color:var(--text);cursor:pointer;font-family:Poppins,sans-serif;font-weight:600"';
+  const btnActive = 'style="padding:6px 10px;font-size:13px;min-width:36px;border-radius:6px;border:1.5px solid var(--mid);background:var(--mid);color:#fff;cursor:pointer;font-family:Poppins,sans-serif;font-weight:700"';
+  const btnNav = 'style="padding:6px 10px;font-size:13px;min-width:36px;border-radius:6px;border:1.5px solid var(--field-border);background:var(--surface-alt);color:var(--text);cursor:pointer;font-family:Poppins,sans-serif;font-weight:700"';
+  const dots = '<span style="padding:6px 4px;color:var(--muted);font-size:13px">…</span>';
+
+  let html = '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center">';
+
+  /* Total de registros */
+  html += `<span style="font-size:12px;color:var(--muted);margin-right:8px">Total: ${filteredLen}${q?' (filtrados)':''}</span>`;
+
+  /* Botão anterior */
+  html += `<button ${current === 0 ? 'disabled ' : ''}${btnNav} data-fin-page="${current - 1}">‹</button>`;
+
+  /* Páginas com reticências */
+  let prev = -1;
+  for(const p of pages){
+    if(prev !== -1 && p - prev > 1) html += dots;
+    html += `<button ${p === current ? btnActive : btnBase} data-fin-page="${p}">${p + 1}</button>`;
+    prev = p;
+  }
+
+  /* Botão próximo */
+  html += `<button ${current === total - 1 ? 'disabled ' : ''}${btnNav} data-fin-page="${current + 1}">›</button>`;
+
+  html += '</div>';
+  paginationEl.innerHTML = html;
+  paginationEl.querySelectorAll('[data-fin-page]').forEach(btn => {
+    if(btn.disabled) return;
+    btn.addEventListener('click', () => onPageClick(Number(btn.dataset.finPage)));
+  });
+}
+
 function renderFinalizadasFiltradas(q){
   const finalizadas = ordens.filter(o=>o.status==='FINALIZADA');
   const filtradas = q ? finalizadas.filter(o=>{
@@ -480,21 +527,7 @@ function renderFinalizadasFiltradas(q){
     </tr>`).join('') : `<tr><td colspan="13" class="empty">Nenhuma O.S. encontrada.</td></tr>`;
 
   const pagination = document.getElementById('finalizadasPagination');
-  if(pagination){
-    if(totalPages <= 1){ pagination.innerHTML = ''; }
-    else {
-      let btns = '';
-      for(let i = 0; i < totalPages; i++){
-        const start = i * FINALIZADAS_PER_PAGE + 1;
-        const end = Math.min((i + 1) * FINALIZADAS_PER_PAGE, filtradas.length);
-        btns += `<button class="btn btn-secondary${i === finalizadasPage ? ' tab is-active' : ''}" style="padding:8px 14px;font-size:13px" type="button" data-fin-page="${i}">Página ${i+1} <span style="font-weight:400;opacity:.7">(${start}–${end})</span></button>`;
-      }
-      pagination.innerHTML = `<span style="font-size:13px;color:var(--muted)">Total: ${filtradas.length} registros${q ? ' (filtrados)' : ''}</span> ${btns}`;
-      pagination.querySelectorAll('[data-fin-page]').forEach(btn => {
-        btn.addEventListener('click', ()=>{ finalizadasPage = Number(btn.dataset.finPage); renderFinalizadasFiltradas(q); });
-      });
-    }
-  }
+  buildPagination(finalizadasPage, totalPages, q, filtradas.length, pagination, (p)=>{ finalizadasPage=p; renderFinalizadasFiltradas(q); });
 }
 
 function closeModal(){
