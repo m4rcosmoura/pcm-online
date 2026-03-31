@@ -3,7 +3,7 @@
 <!-- Idealizado e desenvolvido por Marcos Moura-->
 
 <head>
-<link rel="icon" href="assets/img/operador.ico">
+<link rel="icon" href="./assets/img/operador.ico">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Operador - Ordens de Serviço</title>
@@ -11,10 +11,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Poppins:wght@600;700;900&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="assets/css/styles.css">
-<script src="config/config.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/db.js"></script>
+<link rel="stylesheet" href="./assets/css/styles.css">
+<script src="./config/config.js"></script>
+<script src="./js/utils.js"></script>
+<script src="./js/db.js"></script>
 <script>
 (function(){
   const key = 'pcm_theme';
@@ -171,8 +171,8 @@
     <div class="modal-body">
       <div id="confirmBody" class="summary-box"></div>
       <div class="field" style="margin-top:14px">
-        <label for="fDataInicio">Data/Hora de início <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label>
-        <input id="fDataInicio" class="input" type="datetime-local">
+        <label for="fDataInicio">Data/Hora de início <span class="req">*</span></label>
+        <input id="fDataInicio" class="input" type="datetime-local" required>
       </div>
     </div>
     <div class="modal-footer"><button id="btnCancelConfirm" class="btn btn-secondary" type="button">Cancelar</button><button id="btnConfirmStart" class="btn" type="button">Confirmar início</button></div>
@@ -213,8 +213,12 @@
           <textarea id="fCausa" class="textarea" placeholder="Descreva a causa raiz"></textarea>
         </div>
         <div class="field">
-          <label for="fDataFim">Data/Hora de finalização <span style="font-size:11px;color:var(--muted);font-weight:400">(deixe em branco para usar agora)</span></label>
-          <input id="fDataFim" class="input" type="datetime-local">
+          <label for="fDataInicioFim">Data/Hora de início da execução <span class="req">*</span></label>
+          <input id="fDataInicioFim" class="input" type="datetime-local" required>
+        </div>
+        <div class="field">
+          <label for="fDataFim">Data/Hora de finalização <span class="req">*</span></label>
+          <input id="fDataFim" class="input" type="datetime-local" required>
         </div>
         <div class="field">
           <label>Local</label>
@@ -439,6 +443,7 @@ closeBackdrop.addEventListener('click', e=>{ if(e.target===closeBackdrop) closeC
 document.getElementById('btnConfirmStart').addEventListener('click', async ()=>{
   if(!rowToStart) return;
   const dataInicioInput = document.getElementById('fDataInicio').value;
+  if(!dataInicioInput){ alert('Informe a Data/Hora de início.'); return; }
   let dataInicioManual = '';
   if(dataInicioInput){
     const d = new Date(dataInicioInput);
@@ -458,6 +463,13 @@ document.getElementById('btnEncerrar').addEventListener('click', async ()=>{ try
   const causa_raiz = document.getElementById('fCausa').value.trim();
   const o_que_feito = document.getElementById('fOQueFeito').value.trim();
   const o_que_falta = document.getElementById('fOQueFalta').value.trim();
+  const dataInicioFimInput = document.getElementById('fDataInicioFim').value;
+  let dataInicioFimManual = '';
+  if(dataInicioFimInput){
+    const d = new Date(dataInicioFimInput);
+    const p = n => String(n).padStart(2,'0');
+    dataInicioFimManual = `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
   const dataFimInput = document.getElementById('fDataFim').value;
   let dataFimManual = '';
   if(dataFimInput){
@@ -467,6 +479,8 @@ document.getElementById('btnEncerrar').addEventListener('click', async ()=>{ try
   }
 
   if(!conclusao){ alert('Indique se o serviço foi concluído ou não.'); return; }
+  if(!dataInicioFimManual){ alert('Informe a Data/Hora de início da execução.'); return; }
+  if(!dataFimManual){ alert('Informe a Data/Hora de finalização.'); return; }
   if(!o_que_feito){ alert('Informe o que foi feito neste turno.'); return; }
   if(conclusao === 'nao' && !o_que_falta){ alert('Informe o que falta / próximos passos.'); return; }
   if(!causa_raiz){ alert('Informe a causa raiz.'); return; }
@@ -491,6 +505,7 @@ document.getElementById('btnEncerrar').addEventListener('click', async ()=>{ try
     componente: componenteFinal,
     o_que_feito,
     o_que_falta: conclusao === 'nao' ? o_que_falta : '',
+    data_inicio: dataInicioFimManual || undefined,
     data_fim: dataFimManual || undefined
   });
 
@@ -539,6 +554,7 @@ function closeCloseModal(){
   document.getElementById('fOQueFeito').value='';
   document.getElementById('fOQueFalta').value='';
   document.getElementById('fDataFim').value='';
+  const _dfif = document.getElementById('fDataInicioFim'); if(_dfif) _dfif.value='';
   document.getElementById('fOQueFaltaWrap').style.display='none';
   document.getElementById('rConcluido').checked=false;
   document.getElementById('rPendente').checked=false;
@@ -551,7 +567,8 @@ function closeCloseModal(){
   if(window._pollController) window._pollController.resume();
 }
 /* Abre o modal de confirmação de início de OS, pausando o polling para evitar recargas durante a edição */
-function openConfirm(id){ rowToStart = ordens.find(o=>String(o.id_os)===String(id)); if(!rowToStart) return; if(window._pollController) window._pollController.pause(); document.getElementById('confirmBody').innerHTML = `
+function toDatetimeLocalValue(d){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+function openConfirm(id){ rowToStart = ordens.find(o=>String(o.id_os)===String(id)); if(!rowToStart) return; if(window._pollController) window._pollController.pause(); document.getElementById('fDataInicio').value = toDatetimeLocalValue(new Date()); document.getElementById('confirmBody').innerHTML = `
   <div><b>O.S.</b> ${rowToStart.id_os} &nbsp; <b>Prioridade:</b> ${PCMDB.escapeHtml(rowToStart.prioridade)}</div>
   <div><b>Local:</b> ${PCMDB.escapeHtml(rowToStart.local)}</div>
   <div><b>Equipamento:</b> ${PCMDB.escapeHtml(rowToStart.equipamento)}</div>
@@ -588,6 +605,9 @@ function openCloseModal(id){
   ddState.componente.value = splitMultiValue(rowToClose.componente);
   ddState.componente.search = '';
   Object.keys(ddState).forEach(renderDropdown);
+  document.getElementById('fDataFim').value = toDatetimeLocalValue(new Date());
+  const dataInicioFimEl = document.getElementById('fDataInicioFim');
+  if(dataInicioFimEl) dataInicioFimEl.value = rowToClose.data_inicio ? (function(){ const d=PCMUtils.parseBR(rowToClose.data_inicio); return d ? toDatetimeLocalValue(d) : ''; })() : '';
   closeBackdrop.classList.add('is-open');
 }
 
