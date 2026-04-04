@@ -568,7 +568,7 @@ function closeCloseModal(){
 }
 /* Abre o modal de confirmação de início de OS, pausando o polling para evitar recargas durante a edição */
 function toDatetimeLocalValue(d){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
-function openConfirm(id){ rowToStart = ordens.find(o=>String(o.id_os)===String(id)); if(!rowToStart) return; if(window._pollController) window._pollController.pause(); document.getElementById('fDataInicio').value = toDatetimeLocalValue(new Date()); document.getElementById('confirmBody').innerHTML = `
+function openConfirm(id){ rowToStart = ordens.find(o=>String(o.id_os)===String(id)); if(!rowToStart) return; if(window._pollController) window._pollController.pause(); document.getElementById('fDataInicio').value = ''; document.getElementById('confirmBody').innerHTML = `
   <div><b>O.S.</b> ${rowToStart.id_os} &nbsp; <b>Prioridade:</b> ${PCMDB.escapeHtml(rowToStart.prioridade)}</div>
   <div><b>Local:</b> ${PCMDB.escapeHtml(rowToStart.local)}</div>
   <div><b>Equipamento:</b> ${PCMDB.escapeHtml(rowToStart.equipamento)}</div>
