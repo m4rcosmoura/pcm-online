@@ -15,6 +15,7 @@
 <script src="config/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/db.js"></script>
+<!-- db.js atualizado: suporte a getInactiveLists / setInactiveLists / toggleInactiveItem -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script>
 (function(){
@@ -140,7 +141,7 @@
         <label for="cadSearchInput">Pesquisar já cadastrados</label>
         <input id="cadSearchInput" class="input" type="search" placeholder="Pesquise dentro do cadastro selecionado">
       </div>
-      <div class="cad-helper" style="margin-top:8px">Para editar um cadastro, pesquise o item e clique em editar.</div>
+      <div class="cad-helper" style="margin-top:8px">Pesquise um item para <strong>editar</strong>, <strong>ativar</strong> ou <strong>desativar</strong>. Itens inativos não aparecem nas caixas de seleção, mas o histórico é preservado.</div>
       <div id="cadSearchResults" class="cad-summary" style="margin-top:12px"></div>
       <div id="cadEditBox" class="cad-summary" style="margin-top:12px; display:none"></div>
       <div id="cadSummary" class="cad-summary"></div>
@@ -389,6 +390,15 @@ window.addEventListener('storage', (event)=>{
 let editingOrderId = null;
 let editingCadastroIndex = -1;
 
+/* Listas inativas carregadas do banco — itens inativos não aparecem nos dropdowns */
+let inactiveLists = { local:[], equipamento:[], componente:[], executores:[], tipo_manutencao:[], solicitante:[] };
+
+/* Verifica se um valor está inativo em uma lista */
+function isInactive(listKey, value){
+  const arr = inactiveLists[listKey] || [];
+  return arr.some(v => String(v).trim().toUpperCase() === String(value).trim().toUpperCase());
+}
+
 const cadConfig = {
   local: { listKey:'local', label:'Local' },
   equipamento: { listKey:'equipamento', label:'Equipamento' },
@@ -557,9 +567,23 @@ function openModal(){
 
 function resetDropdowns(){ Object.keys(ddState).forEach(k=>{ ddState[k].search=''; ddState[k].value = ddState[k].multiple ? [] : null; }); }
 function sortAlpha(items){ return [...(items || [])].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base',numeric:true})); }
+/* Retorna a lista filtrada — remove itens inativos dos dropdowns de seleção */
 function listFor(key){
+  let raw;
+  let inactiveKey;
+  if(key === 'tipo'){ raw = lists.tipo_manutencao || lists.tipo || []; inactiveKey = 'tipo_manutencao'; }
+  else if(key === 'componente'){ raw = lists.componente || []; inactiveKey = 'componente'; }
+  else if(key === 'executores'){ raw = lists.executores || []; inactiveKey = 'executores'; }
+  else { raw = lists[key] || []; inactiveKey = key; }
+  const inactive = inactiveLists[inactiveKey] || [];
+  const filtered = raw.filter(v => !inactive.some(iv => String(iv).trim().toUpperCase() === String(v).trim().toUpperCase()));
+  return sortAlpha(filtered);
+}
+/* Retorna a lista COMPLETA (ativos + inativos) — usada exclusivamente no painel de Cadastros */
+function listForAll(key){
   if(key === 'tipo') return sortAlpha(lists.tipo_manutencao || lists.tipo || []);
   if(key === 'componente') return sortAlpha(lists.componente || []);
+  if(key === 'executores') return sortAlpha(lists.executores || []);
   return sortAlpha(lists[key] || []);
 }
 function selectedLabel(key){ const s = ddState[key]; if(s.multiple) return s.value; return s.value ? [s.value] : []; }
@@ -600,11 +624,15 @@ function getCadListKey(key){ return cadConfig[key].listKey; }
 function renderCadastros(){
   const key = cadTypeSelect.value;
   const cfg = cadConfig[key];
-  const values = listFor(cfg.listKey);
+  const values = listForAll(cfg.listKey);
   const total = values.length;
-  const exemplos = values.slice(0, 5).map(v => `<span class="dd-chip">${PCMDB.escapeHtml(v)}</span>`).join(' ');
+  const totalAtivos = values.filter(v => !isInactive(cfg.listKey, v)).length;
+  const totalInativos = total - totalAtivos;
+  const exemplos = values.filter(v => !isInactive(cfg.listKey, v)).slice(0, 5).map(v => `<span class="dd-chip">${PCMDB.escapeHtml(v)}</span>`).join(' ');
   cadSummary.innerHTML = `
-    <div class="cad-count">${total} ${total===1 ? 'item cadastrado' : 'itens cadastrados'} em ${cfg.label.toLowerCase()}</div>
+    <div class="cad-count">${total} ${total===1 ? 'item cadastrado' : 'itens cadastrados'} em ${cfg.label.toLowerCase()}
+      ${totalInativos > 0 ? `<span style="margin-left:10px;font-size:12px;color:#f59e0b;font-weight:600">(${totalInativos} inativo${totalInativos>1?'s':''})</span>` : ''}
+    </div>
     <div class="cad-helper">Para manter a tela leve, o sistema mostra apenas uma amostra do cadastro.</div>
     ${exemplos ? `<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">${exemplos}</div>` : '<div class="cad-helper" style="margin-top:8px">Nenhum item cadastrado ainda.</div>'}
   `;
@@ -613,7 +641,7 @@ function renderCadastros(){
 }
 
 function findCadastroIndex(listKey, value){
-  return listFor(listKey).findIndex(item => normalizeValue(item).localeCompare(normalizeValue(value),'pt-BR',{sensitivity:'base'})===0);
+  return listForAll(listKey).findIndex(item => normalizeValue(item).localeCompare(normalizeValue(value),'pt-BR',{sensitivity:'base'})===0);
 }
 function startCadastroEdit(value){
   const key = cadTypeSelect.value;
@@ -621,7 +649,7 @@ function startCadastroEdit(value){
   const listKey = cfg.listKey;
   editingCadastroIndex = findCadastroIndex(listKey, value);
   if(editingCadastroIndex < 0) return;
-  const actual = listFor(listKey)[editingCadastroIndex];
+  const actual = listForAll(listKey)[editingCadastroIndex];
   document.getElementById('cadEditBox').style.display = 'block';
   document.getElementById('cadEditBox').innerHTML = `
     <div class="cad-count">Editando ${cfg.label.toLowerCase()}</div>
@@ -637,7 +665,7 @@ async function updateCadastroValue(){
   const key = cadTypeSelect.value;
   const cfg = cadConfig[key];
   const listKey = cfg.listKey;
-  const currentList = [...listFor(listKey)];
+  const currentList = [...listForAll(listKey)];
   if(editingCadastroIndex < 0 || !currentList[editingCadastroIndex]) return;
   const newValue = sanitizeCadastroValue(document.getElementById('cadEditInput')?.value || '');
   const editInput = document.getElementById('cadEditInput');
@@ -722,7 +750,7 @@ async function saveListValue(key, rawValue){
   cadValueInput.value = value;
   if(!value) return;
   const listKey = getCadListKey(key);
-  const current = sortUnique(listFor(listKey));
+  const current = sortUnique(listForAll(listKey));
   if(current.some(item=>item.localeCompare(value,'pt-BR',{sensitivity:'base'})===0)){
     alert('Esse item já existe no cadastro.');
     return;
@@ -742,12 +770,28 @@ document.addEventListener('click', async (e)=>{
   const remove = e.target.closest('[data-dd-remove]');
   const cadSave = e.target.closest('#btnCadSave');
   const cadEdit = e.target.closest('[data-cad-edit]');
+  const cadToggle = e.target.closest('[data-cad-toggle]');
   const cadUpdate = e.target.closest('#btnCadUpdate');
   const cadCancelEdit = e.target.closest('#btnCadCancelEdit');
   const osEdit = e.target.closest('[data-os-edit]');
   const osDelete = e.target.closest('[data-os-delete]');
   const osPrint = e.target.closest('[data-os-print]');
   if(cadSave){ saveListValue(cadTypeSelect.value, cadValueInput.value); return; }
+  if(cadToggle){
+    const key = cadTypeSelect.value;
+    const cfg = cadConfig[key];
+    const value = cadToggle.dataset.cadToggle;
+    const willDeactivate = !isInactive(cfg.listKey, value);
+    const msg = willDeactivate
+      ? `Desativar "${value}"?\n\nO item não aparecerá mais nas caixas de seleção, mas o histórico de O.S. será preservado.`
+      : `Reativar "${value}"?\n\nO item voltará a aparecer nas caixas de seleção.`;
+    if(!askConfirmation(msg)) return;
+    inactiveLists = await PCMDB.toggleInactiveItem(cfg.listKey, value);
+    renderAllDropdowns();
+    renderCadastros();
+    renderCadastroSearchResults();
+    return;
+  }
   if(cadEdit){ startCadastroEdit(cadEdit.dataset.cadEdit); return; }
   if(cadUpdate){ updateCadastroValue(); return; }
   if(cadCancelEdit){ cancelCadastroEdit(); return; }
@@ -904,7 +948,8 @@ function renderCadastroSearchResults(){
   const key = cadTypeSelect.value;
   const cfg = cadConfig[key];
   const q = normalizeValue(cadSearchInput.value || '').toLowerCase();
-  const values = listFor(cfg.listKey).filter(v => !q || String(v).toLowerCase().includes(q));
+  /* Busca em TODOS os itens (ativos + inativos) */
+  const values = listForAll(cfg.listKey).filter(v => !q || String(v).toLowerCase().includes(q));
   if(!q){
     cadSearchResults.innerHTML = '<div class="cad-helper">Digite algo para localizar um cadastro específico.</div>';
     return;
@@ -913,11 +958,27 @@ function renderCadastroSearchResults(){
     cadSearchResults.innerHTML = '<div class="cad-helper">Nenhum item encontrado.</div>';
     return;
   }
-  cadSearchResults.innerHTML = values.map(v => `
-    <div class="cad-result-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)">
-      <div>${PCMDB.escapeHtml(v)}</div>
-      <button class="btn btn-secondary" type="button" data-cad-edit="${PCMDB.escapeHtml(v)}">Editar</button>
-    </div>`).join('');
+  cadSearchResults.innerHTML = values.map(v => {
+    const inactive = isInactive(cfg.listKey, v);
+    const statusBadge = inactive
+      ? `<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.35)">INATIVO</span>`
+      : `<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(22,163,74,.15);color:#16a34a;border:1px solid rgba(22,163,74,.35)">ATIVO</span>`;
+    const toggleLabel = inactive ? '✅ Ativar' : '⛔ Desativar';
+    const toggleStyle = inactive
+      ? 'background:rgba(22,163,74,.12);color:#16a34a;border:1.5px solid rgba(22,163,74,.4)'
+      : 'background:rgba(245,158,11,.12);color:#f59e0b;border:1.5px solid rgba(245,158,11,.4)';
+    return `
+    <div class="cad-result-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        ${statusBadge}
+        <span style="${inactive ? 'opacity:.5;text-decoration:line-through;' : ''}">${PCMDB.escapeHtml(v)}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn btn-secondary" type="button" style="padding:6px 12px;font-size:12px;${toggleStyle}" data-cad-toggle="${PCMDB.escapeHtml(v)}">${toggleLabel}</button>
+        <button class="btn btn-secondary" type="button" style="padding:6px 12px;font-size:12px" data-cad-edit="${PCMDB.escapeHtml(v)}">✏️ Editar</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 
@@ -946,11 +1007,18 @@ function reportRows(type, startDate, endDate){
   return [];
 }
 function reportCadastroRows(){
+  /* Relatório inclui todos os cadastros — ativos e inativos — com indicação do status */
+  function withStatus(items, listKey){
+    return items.map(v => ({
+      ativo: isInactive(listKey, v) ? 'NÃO' : 'SIM',
+      descricao: v
+    }));
+  }
   return [
-    ...listFor('local').map(v => ({ tipo:'Local', descricao:v })),
-    ...listFor('equipamento').map(v => ({ tipo:'Equipamento', descricao:v })),
-    ...listFor('componente').map(v => ({ tipo:'Componente', descricao:v })),
-    ...listFor('executores').map(v => ({ tipo:'Operador', descricao:v }))
+    ...listForAll('local').map(v => ({ tipo:'Local',       ativo: isInactive('local', v) ? 'NÃO' : 'SIM', descricao:v })),
+    ...listForAll('equipamento').map(v => ({ tipo:'Equipamento', ativo: isInactive('equipamento', v) ? 'NÃO' : 'SIM', descricao:v })),
+    ...listForAll('componente').map(v => ({ tipo:'Componente',   ativo: isInactive('componente', v) ? 'NÃO' : 'SIM', descricao:v })),
+    ...listForAll('executores').map(v => ({ tipo:'Operador',     ativo: isInactive('executores', v) ? 'NÃO' : 'SIM', descricao:v }))
   ];
 }
 function toCsv(rows){
@@ -1645,12 +1713,14 @@ document.getElementById('kpiDateClear')?.addEventListener('click', ()=>{
   applyTheme(readStoredTheme());
   await PCMDB.initDB();
   lists = await PCMDB.getLists();
+  inactiveLists = await PCMDB.getInactiveLists();
   renderAllDropdowns();
   renderCadastros();
   renderCadastroSearchResults();
   await loadAndRender();
   window._pollController = PCMDB.subscribeChanges(async ()=>{
     lists = await PCMDB.getLists();
+    inactiveLists = await PCMDB.getInactiveLists();
     renderAllDropdowns();
     renderCadastros();
     renderCadastroSearchResults();

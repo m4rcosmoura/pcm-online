@@ -99,6 +99,20 @@ const DEFAULT_LISTS = {
   solicitante: [] /* preenchido pelo painel de cadastros */
 };
 
+/*
+  Estrutura padrão para listas inativas.
+  Cada chave é um array de valores que estão desativados.
+  Itens inativos não aparecem nos dropdowns, mas o histórico é preservado.
+*/
+const DEFAULT_INACTIVE = {
+  local: [],
+  equipamento: [],
+  componente: [],
+  executores: [],
+  tipo_manutencao: [],
+  solicitante: []
+};
+
 /* ── infraestrutura HTTP ── */
 
 /* Lança um erro claro se o config.js não foi preenchido */
@@ -197,6 +211,15 @@ async function ensureLists(){
       body: JSON.stringify({ id: 'default', lists: structured(DEFAULT_LISTS), updated_at: nowBR() })
     });
   }
+  /* Garante que o registro de inativos também existe */
+  const inactiveRec = await getInactiveRecord();
+  if(!inactiveRec){
+    await rest('listas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=merge-duplicates' },
+      body: JSON.stringify({ id: 'inactive', lists: structured(DEFAULT_INACTIVE), updated_at: nowBR() })
+    });
+  }
 }
 
 /* ── meta ── */
@@ -225,6 +248,12 @@ async function getListRecord(){
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
+/* Busca o registro de listas inativas. Retorna null se não existir. */
+async function getInactiveRecord(){
+  const rows = await rest('listas?id=eq.inactive&select=*');
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
 /*
   Retorna as listas de seleção do banco (local, equipamento, executores, etc.).
   Se o banco não tiver o registro ainda, retorna os DEFAULT_LISTS como fallback.
@@ -232,6 +261,15 @@ async function getListRecord(){
 async function getLists(){
   const rec = await getListRecord();
   return structured(rec?.lists || DEFAULT_LISTS);
+}
+
+/*
+  Retorna o objeto de listas inativas.
+  Cada chave é um array de valores desativados.
+*/
+async function getInactiveLists(){
+  const rec = await getInactiveRecord();
+  return structured(rec?.lists || DEFAULT_INACTIVE);
 }
 
 /*
@@ -246,6 +284,41 @@ async function setLists(lists){
   });
   notifyChange();
   return rows && rows[0] ? rows[0] : null;
+}
+
+/*
+  Salva as listas inativas no banco e notifica outras abas.
+  Chamado pelo painel de cadastros ao ativar/desativar um item.
+*/
+async function setInactiveLists(inactive){
+  const rows = await rest('listas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify({ id: 'inactive', lists: structured(inactive), updated_at: nowBR() })
+  });
+  notifyChange();
+  return rows && rows[0] ? rows[0] : null;
+}
+
+/*
+  Alterna o estado ativo/inativo de um item de uma lista.
+  `listKey`: chave da lista (ex: 'local', 'equipamento', 'executores')
+  `value`: valor do item a ser alternado
+  Retorna o novo objeto de inativas atualizado.
+*/
+async function toggleInactiveItem(listKey, value){
+  const inactive = await getInactiveLists();
+  if(!inactive[listKey]) inactive[listKey] = [];
+  const idx = inactive[listKey].findIndex(
+    v => String(v).trim().toUpperCase() === String(value).trim().toUpperCase()
+  );
+  if(idx >= 0){
+    inactive[listKey].splice(idx, 1); /* reativa */
+  } else {
+    inactive[listKey].push(value);    /* desativa */
+  }
+  await setInactiveLists(inactive);
+  return inactive;
 }
 
 /* ── ordens de serviço ── */
@@ -346,6 +419,8 @@ async function finishOrder(id, payload = {}){
   ordem.o_que_falta           = payload.o_que_falta          || ordem.o_que_falta          || '';
   ordem.pendente              = !!payload.pendente;
   ordem.os_origem             = payload.os_origem            || ordem.os_origem            || null;
+  if(payload.data_inicio) ordem.data_inicio = payload.data_inicio;
+  if(payload.data_fim)    ordem.data_fim    = payload.data_fim;
   return updateOrder(ordem);
 }
 
@@ -367,6 +442,7 @@ async function exportBackup(){
     exported_at: nowBR(),
     structure:   STRUCTURE_TAG,
     lists:       await getLists(),
+    inactive:    await getInactiveLists(),
     ordens:      await getAllOrders()
   };
 }
@@ -378,6 +454,7 @@ async function exportBackup(){
 */
 async function importBackup(backup){
   if(backup?.lists) await setLists(backup.lists);
+  if(backup?.inactive) await setInactiveLists(backup.inactive);
   if(Array.isArray(backup?.ordens)){
     for(const ordem of backup.ordens){
       const exists = await getOrder(ordem.id_os);
@@ -439,6 +516,7 @@ function onExternalChange(cb){
 window.PCMDB = {
   initDB,
   getLists, setLists,
+  getInactiveLists, setInactiveLists, toggleInactiveItem,
   getAllOrders, getOrder, addOrder, updateOrder, startOrder, finishOrder, deleteOrder,
   exportBackup, importBackup,
   notifyChange, onExternalChange,

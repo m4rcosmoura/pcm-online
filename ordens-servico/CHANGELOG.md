@@ -7,6 +7,14 @@ Todas as mudanças relevantes do projeto são registradas aqui.
 ## [Não lançado]
 
 ### Adicionado
+- **Ativar / Desativar cadastros**: itens de Local, Equipamento, Componente e Operador podem ser desativados pelo painel de Cadastros sem excluir o histórico de O.S.
+- Itens inativos **não aparecem** nas caixas de seleção (dropdowns) do PCM e do Operador.
+- O histórico de O.S. que já usou itens inativos é integralmente **preservado**.
+- Badge visual `ATIVO` / `INATIVO` na lista de resultados de pesquisa de cadastros.
+- Contador de inativos exibido no resumo de cadastros.
+- Relatório de Cadastros agora inclui coluna `ativo` (SIM/NÃO) para todos os itens.
+- Backup (`exportBackup`) agora inclui o objeto `inactive` com as listas desativadas.
+- `db.js`: novas funções `getInactiveLists`, `setInactiveLists` e `toggleInactiveItem`.
 - Estrutura de pastas profissional (`assets/`, `js/`, `pages/`, `config/`, `db/`)
 - `utils.js` separado com helpers gerais
 - `db.js` isolado como camada de acesso ao banco

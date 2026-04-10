@@ -60,6 +60,23 @@ Execute no Supabase SQL Editor para criar as tabelas e políticas.
 
 ---
 
+## Ativar / Desativar cadastros
+
+Itens de **Local**, **Equipamento**, **Componente** e **Operador** podem ser desativados sem excluir histórico:
+
+1. Acesse a aba **Cadastros** no PCM
+2. Pesquise o item desejado
+3. Clique em **⛔ Desativar** (ou **✅ Ativar** para reativar)
+
+| Comportamento         | Detalhe |
+|-----------------------|---------|
+| Dropdowns             | Itens inativos **não aparecem** nas caixas de seleção |
+| Histórico de O.S.     | **Preservado** — nenhum dado é excluído |
+| Relatório de Cadastros | Inclui coluna `ativo` (SIM/NÃO) para rastreabilidade |
+| Backup                | O objeto `inactive` é exportado e importado junto com os dados |
+
+---
+
 ## Roadmap
 
 - [ ] Migração para servidor corporativo

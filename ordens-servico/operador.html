@@ -246,6 +246,12 @@
    ordens: todas as OS carregadas do banco
    rowToStart / rowToClose: OS selecionada para iniciar ou finalizar */
 let lists, ordens = [], rowToStart = null, rowToClose = null;
+/* Listas inativas — itens desativados não aparecem nos dropdowns */
+let inactiveLists = { local:[], equipamento:[], componente:[], executores:[], tipo_manutencao:[], solicitante:[] };
+function isInactive(listKey, value){
+  const arr = inactiveLists[listKey] || [];
+  return arr.some(v => String(v).trim().toUpperCase() === String(value).trim().toUpperCase());
+}
 const tabs = document.querySelectorAll('.tab');
 const pages = document.querySelectorAll('.page');
 const searchInput = document.getElementById('searchInput');
@@ -410,7 +416,12 @@ function renderDropdown(key){
   const host = document.querySelector(`.dd[data-dd="${key}"]`);
   const cfg = ddState[key];
   const chosen = selectedLabel(key);
-  const options=sortAlpha(lists?.[key]||[]).filter(v=>String(v).toLowerCase().includes((cfg.search||'').toLowerCase()));
+  /* Mapeia key do ddState para a chave de inatividade */
+  const inactiveKey = key === 'componente' ? 'componente' : key;
+  const rawList = sortAlpha(lists?.[key]||[]);
+  /* Remove itens inativos do dropdown */
+  const activeList = rawList.filter(v => !isInactive(inactiveKey, v));
+  const options = activeList.filter(v=>String(v).toLowerCase().includes((cfg.search||'').toLowerCase()));
   host.innerHTML = `
     <div class="dd-box ${host.dataset.open==='1'?'is-open':''}" data-dd-box="${key}">${chosen.length ? chosen.map(v=>`<span class="dd-chip">${PCMDB.escapeHtml(v)}${cfg.multiple?`<button type="button" data-dd-remove="${key}" data-value="${PCMDB.escapeHtml(v)}">×</button>`:''}</span>`).join('') : `<span class="dd-placeholder">Pesquisar e selecionar...</span>`}</div>
     <div class="dd-menu ${host.dataset.open==='1'?'is-open':''}">
@@ -1087,7 +1098,20 @@ function printOrder(id){
 
 /* Ponto de entrada: inicializa o banco, carrega as listas, renderiza os dados
    e liga o polling que mantém a página sincronizada com o banco */
-(async function init(){ applyTheme(readStoredTheme()); await PCMDB.initDB(); lists = await PCMDB.getLists(); Object.keys(ddState).forEach(renderDropdown); await loadAndRender(); window._pollController = PCMDB.subscribeChanges(loadAndRender); })();
+(async function init(){
+  applyTheme(readStoredTheme());
+  await PCMDB.initDB();
+  lists = await PCMDB.getLists();
+  inactiveLists = await PCMDB.getInactiveLists();
+  Object.keys(ddState).forEach(renderDropdown);
+  await loadAndRender();
+  window._pollController = PCMDB.subscribeChanges(async ()=>{
+    lists = await PCMDB.getLists();
+    inactiveLists = await PCMDB.getInactiveLists();
+    Object.keys(ddState).forEach(renderDropdown);
+    await loadAndRender();
+  });
+})();
 
 /* Ajusta a altura máxima das tabelas dinamicamente para não ultrapassar a tela */
 function ajustarAlturaTabelas(){
