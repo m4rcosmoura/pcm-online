@@ -213,6 +213,22 @@
       <div class="kpi-grid-two">
         <div class="kpi-panel">
           <div class="kpi-panel-head">
+            <label>Top 10 Locais — Horas Paradas</label>
+            <span id="kpiHorasLocaisHint" class="muted">Todos os equipamentos</span>
+          </div>
+          <div id="chartKpiHorasLocais" class="kpi-chart-box" aria-label="Gráfico Top 10 locais por horas paradas"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
+            <label>Top 10 Equipamentos — Horas Paradas</label>
+            <span id="kpiHorasEquipamentosHint" class="muted">Todos os locais</span>
+          </div>
+          <div id="chartKpiHorasEquipamentos" class="kpi-chart-box" aria-label="Gráfico Top 10 equipamentos por horas paradas"></div>
+        </div>
+
+        <div class="kpi-panel">
+          <div class="kpi-panel-head">
             <label>Top 10 Locais</label>
             <span id="kpiLocaisHint" class="muted">Todos os equipamentos</span>
           </div>
@@ -342,6 +358,8 @@ const tbodyAndamento = document.getElementById('tbodyAndamento');
 const tbodyFinalizadas = document.getElementById('tbodyFinalizadas');
 const chartKpiLocais = document.getElementById('chartKpiLocais');
 const chartKpiEquipamentos = document.getElementById('chartKpiEquipamentos');
+const chartKpiHorasLocais = document.getElementById('chartKpiHorasLocais');
+const chartKpiHorasEquipamentos = document.getElementById('chartKpiHorasEquipamentos');
 const chartKpiOperadores = document.getElementById('chartKpiOperadores');
 const chartKpiHH = document.getElementById('chartKpiHH');
 const chartKpiMTTR = document.getElementById('chartKpiMTTR');
@@ -1130,6 +1148,37 @@ function getKpiPairs(){
   }
   return pairs;
 }
+/* Soma horas paradas (data_fim - data_inicio) por local — apenas OS finalizadas */
+function getHorasParadasPorLocal(ordensFiltered, equipamentoFilter){
+  const totals = new Map();
+  for(const o of ordensFiltered){
+    if(String(o.status||"").toUpperCase()!=="FINALIZADA") continue;
+    const s=PCMUtils.parseBR(o.data_inicio), e=PCMUtils.parseBR(o.data_fim);
+    if(!s||!e||e<=s) continue;
+    const horas=(e-s)/3600000;
+    const locais=splitForKpi(o.local).filter(i=>i!=="SEM CADASTRO");
+    const equipamentos=splitForKpi(o.equipamento).filter(i=>i!=="SEM CADASTRO");
+    if(equipamentoFilter && !equipamentos.includes(equipamentoFilter)) continue;
+    for(const local of locais){ totals.set(local,(totals.get(local)||0)+horas); }
+  }
+  return [...totals.entries()].map(([nome,total])=>({nome,total:Math.round(total*10)/10})).sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome,"pt-BR",{sensitivity:"base"})).slice(0,10);
+}
+/* Soma horas paradas (data_fim - data_inicio) por equipamento — apenas OS finalizadas */
+function getHorasParadasPorEquipamento(ordensFiltered, localFilter){
+  const totals = new Map();
+  for(const o of ordensFiltered){
+    if(String(o.status||"").toUpperCase()!=="FINALIZADA") continue;
+    const s=PCMUtils.parseBR(o.data_inicio), e=PCMUtils.parseBR(o.data_fim);
+    if(!s||!e||e<=s) continue;
+    const horas=(e-s)/3600000;
+    const locais=splitForKpi(o.local).filter(i=>i!=="SEM CADASTRO");
+    const equipamentos=splitForKpi(o.equipamento).filter(i=>i!=="SEM CADASTRO");
+    if(localFilter && !locais.includes(localFilter)) continue;
+    for(const equip of equipamentos){ totals.set(equip,(totals.get(equip)||0)+horas); }
+  }
+  return [...totals.entries()].map(([nome,total])=>({nome,total:Math.round(total*10)/10})).sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome,"pt-BR",{sensitivity:"base"})).slice(0,10);
+}
+
 function countByDimension(pairs, dimension){
   const totals = new Map();
   for(const item of pairs){
@@ -1413,7 +1462,7 @@ function getHHPorTipo(ordensFiltered){
   }
   return [...map.entries()].map(([nome,total])=>({nome,total:Math.round(total*10)/10})).sort((a,b)=>b.total-a.total);
 }
-/* Renderiza os cartões de totais no topo da aba KPI (Total, Abertas, Andamento, Finalizadas, % Corretiva, MTTR) */
+/* Renderiza os cartões de totais no topo da aba KPI (Total, Abertas, Andamento, Finalizadas, % Corretiva, MTTR, Horas Paradas) */
 function renderKpiCards(ordensFiltered){
   if(!kpiCards) return;
   const fin=ordensFiltered.filter(o=>String(o.status||'').toUpperCase()==='FINALIZADA');
@@ -1425,6 +1474,9 @@ function renderKpiCards(ordensFiltered){
   let mttrGeral='-';
   const corrFin=fin.filter(o=>normalizeKpiItem(o.tipo_manutencao)==='CORRETIVA');
   if(corrFin.length){ let soma=0,cnt=0; for(const o of corrFin){ const s=PCMUtils.parseBR(o.data_inicio),e=PCMUtils.parseBR(o.data_fim); if(s&&e&&e>s){soma+=(e-s)/3600000;cnt++;} } if(cnt){ const totalMin=Math.round((soma/cnt)*60); const hh=Math.floor(totalMin/60); const mm=totalMin%60; mttrGeral=hh+'h '+(mm<10?'0':'')+mm+'min'; } }
+  /* Calcula total de horas paradas: soma da duração (data_fim - data_inicio) de todas as OS finalizadas no filtro */
+  let totalHorasParadas='-';
+  { let somaHP=0,cntHP=0; for(const o of fin){ const s=PCMUtils.parseBR(o.data_inicio),e=PCMUtils.parseBR(o.data_fim); if(s&&e&&e>s){somaHP+=(e-s)/3600000;cntHP++;} } if(cntHP){ const hhP=Math.floor(somaHP); const mmP=Math.round((somaHP-hhP)*60); totalHorasParadas=hhP+'h'+(mmP>0?String(mmP).padStart(2,'0')+'m':''); } else if(fin.length){ totalHorasParadas='0h'; } }
   const cards=[
     {label:'Total de O.S.',value:total,color:'#185FA5'},
     {label:'Abertas',value:ab.length,color:'#2563eb'},
@@ -1432,6 +1484,7 @@ function renderKpiCards(ordensFiltered){
     {label:'Finalizadas',value:fin.length,color:'#16a34a'},
     {label:'% Corretiva',value:pctCorr+'%',color:pctCorr>60?'#dc2626':'#185FA5'},
     {label:'MTTR Geral',value:mttrGeral,color:'#0f6e56'},
+    {label:'Horas Paradas',value:totalHorasParadas,color:'#7c3aed'},
   ];
   kpiCards.innerHTML=cards.map(c=>`<div style="background:var(--surface-alt);border:1px solid var(--panel-border);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${c.label}</div><div style="font-size:26px;font-weight:900;color:${c.color};line-height:1">${c.value}</div></div>`).join('');
 }
@@ -1515,6 +1568,8 @@ function renderKpis(){
   renderKpiTipoButtons(pairs);
   const locaisPairs=kpiState.equipamento?pairs.filter(p=>p.equipamento===kpiState.equipamento):pairs;
   const equipPairs =kpiState.local?pairs.filter(p=>p.local===kpiState.local):pairs;
+  renderKpiBarChartHH(chartKpiHorasLocais,getHorasParadasPorLocal(ordensFiltered,kpiState.equipamento||null),{ariaLabel:'Top 10 locais por horas paradas',color:'#7c3aed'});
+  renderKpiBarChartHH(chartKpiHorasEquipamentos,getHorasParadasPorEquipamento(ordensFiltered,kpiState.local||null),{ariaLabel:'Top 10 equipamentos por horas paradas',color:'#7c3aed'});
   renderKpiBarChart(chartKpiLocais,countByDimension(locaisPairs,'local'),{dimension:'local',label:'local',ariaLabel:'Top 10 locais'});
   renderKpiBarChart(chartKpiEquipamentos,countByDimension(equipPairs,'equipamento'),{dimension:'equipamento',label:'equipamento',ariaLabel:'Top 10 equipamentos'});
 
@@ -1529,6 +1584,10 @@ function renderKpis(){
   const tipoHint=kpiState.tipo?` | Tipo: ${kpiState.tipo}`:'';
   if(kpiLocaisHint) kpiLocaisHint.textContent=(kpiState.equipamento?`Filtrado por equipamento: ${kpiState.equipamento}`:'Todos os equipamentos')+tipoHint;
   if(kpiEquipamentosHint) kpiEquipamentosHint.textContent=(kpiState.local?`Filtrado por local: ${kpiState.local}`:'Todos os locais')+tipoHint;
+  const kpiHorasLocaisHint=document.getElementById('kpiHorasLocaisHint');
+  const kpiHorasEquipamentosHint=document.getElementById('kpiHorasEquipamentosHint');
+  if(kpiHorasLocaisHint) kpiHorasLocaisHint.textContent=(kpiState.equipamento?`Filtrado por equipamento: ${kpiState.equipamento}`:'Todos os equipamentos')+tipoHint;
+  if(kpiHorasEquipamentosHint) kpiHorasEquipamentosHint.textContent=(kpiState.local?`Filtrado por local: ${kpiState.local}`:'Todos os locais')+tipoHint;
 }
 function handleKpiInteraction(event){
   const tipoBtn=event.target.closest('[data-kpi-tipo]');
@@ -1629,6 +1688,10 @@ chartKpiLocais?.addEventListener('click', handleKpiInteraction);
 chartKpiEquipamentos?.addEventListener('click', handleKpiInteraction);
 chartKpiLocais?.addEventListener('keydown', (event)=>{ if(event.key==='Enter' || event.key===' '){ event.preventDefault(); handleKpiInteraction(event); } });
 chartKpiEquipamentos?.addEventListener('keydown', (event)=>{ if(event.key==='Enter' || event.key===' '){ event.preventDefault(); handleKpiInteraction(event); } });
+chartKpiHorasLocais?.addEventListener('click', handleKpiInteraction);
+chartKpiHorasEquipamentos?.addEventListener('click', handleKpiInteraction);
+chartKpiHorasLocais?.addEventListener('keydown', (event)=>{ if(event.key==='Enter' || event.key===' '){ event.preventDefault(); handleKpiInteraction(event); } });
+chartKpiHorasEquipamentos?.addEventListener('keydown', (event)=>{ if(event.key==='Enter' || event.key===' '){ event.preventDefault(); handleKpiInteraction(event); } });
 kpiTextFilter?.addEventListener('input', ()=>{ kpiState.text = kpiTextFilter.value || ''; renderKpis(); });
 kpiTipoButtons?.addEventListener('click', handleKpiInteraction);
 kpiDateStart?.addEventListener('change', ()=>{ kpiState.dateStart = kpiDateStart.value || ''; renderKpis(); });
