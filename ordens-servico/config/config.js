@@ -4,6 +4,6 @@
    NÃO envie para o repositório.
 ───────────────────────────────────────── */
 window.APP_CONFIG = {
-  SUPABASE_URL:      "https://brnxwzhhlndiwnhfvrrm.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJybnh3emhobG5kaXduaGZ2cnJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDg0NDYsImV4cCI6MjA4OTUyNDQ0Nn0.jxEdljr-izdEEoDSq--lVu5Bzl-re9-aQLE07l3lHBA"
-};
+  /* Cole aqui a URL do seu Web App gerada no Apps Script
+     Menu: Implantar → Gerenciar implantações → copiar a URL */
+  GS_URL: "https://script.google.com/macros/s/AKfycbxj-SQ6FLbbO7KiH-S5jIXE5a0UYMbq8_R14mg4MaWP_YGXkHLZk7H50bP2Hc3jhYmeCw/exec"};
